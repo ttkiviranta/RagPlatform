@@ -7,4 +7,6 @@ public sealed class HealthStatusResponse
     public required string Application { get; init; }
 
     public required string Version { get; init; }
+
+    public string Database { get; init; } = "Not configured";
 }
