@@ -1,0 +1,58 @@
+# Build outputs
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa]rtifacts/
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.pdb
+*.cache
+*.log
+*.tlog
+*.tmp
+
+# Rider / JetBrains
+.idea/
+*.iml
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# ASP.NET Core / .NET
+appsettings.Development.json
+appsettings.Local.json
+
+# OS-specific
+Thumbs.db
+Desktop.ini
+
+# Secret / local environment files
+.env
+.env.*
+secrets.json
+*.pem
+*.crt
+*.key
+
+# Test and coverage output
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# Generated static assets
+wwwroot/**/*.map
