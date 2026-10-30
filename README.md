@@ -1,84 +1,77 @@
-# RAG Platform 2.0
+﻿# RAG Platform 2.0
 
-A modern enterprise-grade Retrieval-Augmented Generation (RAG) platform demonstrating practical Microsoft AI engineering, scalable application design, and production-oriented software architecture.
+A portfolio project for building a modern .NET-based Retrieval-Augmented Generation platform with a clean architectural foundation.
 
 ## Project Overview
 
-RAG Platform 2.0 is a portfolio project designed to showcase how to build and evolve an AI-enabled application using Microsoft ecosystem technologies and modern engineering practices. The project emphasizes architecture clarity, maintainability, extensibility, and real-world readiness for advanced AI workloads.
+RAG Platform 2.0 is a learning and portfolio project focused on building an AI-enabled application using the Microsoft .NET ecosystem. The project currently focuses on establishing the application foundation and database persistence layer before moving into document processing, vector retrieval, and AI orchestration.
 
-This initiative focuses on building a layered application foundation for document intelligence, AI-powered retrieval, semantic search, orchestration, and observability. It is intended to illustrate how a cloud-native AI system can evolve from a clean API foundation into a full intelligent platform supported by enterprise-grade services and DevOps workflows.
+The solution is intentionally scoped to stay practical and incremental. At this stage, the project demonstrates a working ASP.NET Core API and a PostgreSQL + Entity Framework Core foundation, without yet implementing RAG logic, AI integrations, or repository abstractions beyond the foundational DbContext pattern.
 
-The project is intentionally structured to demonstrate both technical depth and portfolio quality. It highlights modern .NET development, API-first design, AI integration strategies, and future extensibility toward Azure-native services.
+## Current Phase
 
-## Vision and Goals
+### Phase 2: PostgreSQL Foundation
 
-The core vision of RAG Platform 2.0 is to create a practical, extensible AI platform that combines:
+This repository is currently in the PostgreSQL and EF Core foundation milestone.
 
-- Large language model integration
-- Retrieval of contextual enterprise information
-- Semantic search over document knowledge bases
-- Agentic workflows and orchestration patterns
-- Observability, monitoring, and operational readiness
-- Clean architectural boundaries that scale over time
+Completed in this milestone:
 
-Primary goals include:
+- ASP.NET Core Web API
+- Swagger/OpenAPI
+- Health endpoint
+- Dependency injection setup
+- PostgreSQL configuration
+- Entity Framework Core setup
+- ApplicationDbContext implementation
+- Document entity model
+- Initial EF Core migration
+- Docker Compose setup for PostgreSQL
+- Database validation and connectivity checks
 
-- Demonstrate modern .NET-based AI application architecture
-- Create a reusable foundation for future RAG implementations
-- Showcase Microsoft AI and data platform integration patterns
-- Provide a professional-grade portfolio asset for recruiters and engineering leaders
-- Emphasize maintainable architecture over ad hoc prototypes
+Not yet implemented:
+
+- RAG pipeline
+- AI orchestration
+- Azure AI Foundry integration
+- Azure OpenAI integration
+- Semantic Kernel integration
+- Document ingestion and chunking services
+- Vector search and pgvector indexing
+- Repository/service layer beyond the data foundation
+- Blazor UI
 
 ## Architecture Overview
 
-The system is planned around a modular, layered architecture designed for long-term extensibility.
+The current architecture is intentionally minimal and aligned to the roadmap:
 
-### Target Architecture
+- API layer: ASP.NET Core Web API
+- Data layer: PostgreSQL via Entity Framework Core
+- Persistence model: ApplicationDbContext + Document entity
+- Local database runtime: Docker Compose PostgreSQL container
+- Observability: health checks and connectivity validation
 
-- Presentation layer: Blazor-based UI for interaction, dashboards, and administration
-- API layer: ASP.NET Core Web API for endpoints, orchestration, and integration boundaries
-- Application layer: services for orchestration, retrieval, document processing, and AI workflows
-- Domain layer: business logic, models, and domain services
-- Data layer: PostgreSQL + pgvector for structured and vector-based storage
-- AI layer: Azure AI Foundry, Azure OpenAI, and Semantic Kernel integration
-- Observability layer: OpenTelemetry for tracing, metrics, and diagnostics
-- Integration layer: Microsoft Copilot Studio and external AI ecosystem components
-
-### Architectural Principles
-
-- Separation of concerns across layers
-- API-first design
-- Extensible domain services
-- Cloud-native deployment readiness
-- Secure and observable application patterns
-- Modular onboarding for future AI capabilities
+The system is designed to evolve into a full RAG platform without coupling future AI functionality into the current data foundation.
 
 ## Current Project Status
-
-### Project Maturity
-
-Current maturity status: 15% foundational implementation.
-
-The project has established the initial application foundation and is moving toward building the core platform services required for document ingestion, semantic retrieval, and AI reasoning.
 
 ### Status Summary
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Solution structure | ✅ Completed | Base repository and project structure created |
-| ASP.NET Core API foundation | ✅ Completed | API skeleton and controllers enabled |
+| Solution structure | ✅ Completed | Base repository and project structure established |
+| ASP.NET Core API foundation | ✅ Completed | API runs and exposes Swagger |
 | Swagger/OpenAPI | ✅ Completed | API documentation enabled |
-| HTTPS support | ✅ Completed | HTTPS enabled by default |
-| Health endpoint | 🚧 In Progress | Initial API health foundation being stabilized |
-| PostgreSQL integration | 📋 Planned | Database layer pending |
-| Entity Framework Core | 📋 Planned | Persistence and migrations pending |
-| pgvector integration | 📋 Planned | Vector storage and similarity search pending |
-| AI orchestration | 📋 Planned | Semantic Kernel and model integration pending |
-| Azure AI Foundry | 📋 Planned | Cloud AI integration pending |
-| Copilot Studio integration | 📋 Planned | Workflow integration pending |
-| OpenTelemetry | 📋 Planned | Objectives, metrics, and traces pending |
-| Blazor UI | 📋 Planned | Front-end experience pending |
-| CI/CD automation | 📋 Planned | GitHub Actions workflow pending |
+| Health endpoint | ✅ Completed | Health checks include application and database validation |
+| PostgreSQL integration | ✅ Completed | PostgreSQL configured for local development |
+| Entity Framework Core | ✅ Completed | EF Core is configured and working |
+| Document persistence model | ✅ Completed | Document entity and DbSet added |
+| Initial migration | ✅ Completed | Initial EF Core migration created and applied |
+| Docker Compose support | ✅ Completed | PostgreSQL container defined for local use |
+| RAG implementation | 📋 Planned | Not included in this milestone |
+| AI services | 📋 Planned | Azure AI Foundry/OpenAI remain future work |
+| Semantic Kernel | 📋 Planned | Future phase |
+| pgvector / vector retrieval | 📋 Planned | Future phase |
+| Blazor UI | 📋 Planned | Future phase |
 
 ## Technology Stack
 
@@ -87,80 +80,63 @@ The project has established the initial application foundation and is moving tow
 - ASP.NET Core Web API
 - .NET 10
 - Swagger/OpenAPI
-- C# / .NET ecosystem
+- Entity Framework Core
+- Npgsql PostgreSQL provider
+- Docker Compose
 
-### Data and AI
+### Data Foundation
 
-- PostgreSQL (planned)
-- Entity Framework Core (planned)
-- pgvector (planned)
-- Azure AI Foundry (planned)
-- Azure OpenAI (planned)
-- Semantic Kernel (planned)
+- PostgreSQL
+- ApplicationDbContext
+- Document entity
+- EF Core migrations
 
-### Integration and Operations
+### Planned Future Stack
 
-- Microsoft Copilot Studio Integration (planned)
-- OpenTelemetry (planned)
-- GitHub Actions (planned)
-- Docker (planned)
-- Blazor UI (planned)
+- pgvector
+- Azure AI Foundry
+- Azure OpenAI
+- Semantic Kernel
+- Copilot Studio integration
+- Blazor UI
+- OpenTelemetry
 
-## Development Roadmap
+## Roadmap Status
 
-| Phase | Priority | Status | Outcome |
-| --- | --- | --- | --- |
-| Phase 1: API foundation | High | ✅ Completed | Project scaffold, API, Swagger, and base architecture |
-| Phase 2: Data foundation | High | 📋 Planned | PostgreSQL, EF Core, migrations, and schema design |
-| Phase 3: Document pipeline | High | 📋 Planned | File ingestion, chunking, and processing services |
-| Phase 4: Vector search | High | 📋 Planned | Embeddings, vector storage, and retrieval |
-| Phase 5: RAG orchestration | High | 📋 Planned | Retrieval and generation pipeline |
-| Phase 6: Agent frameworks | Medium | 📋 Planned | Orchestration and interaction patterns |
-| Phase 7: Azure integration | Medium | 📋 Planned | Azure AI Foundry and Azure OpenAI connectivity |
-| Phase 8: Observability | Medium | 📋 Planned | OpenTelemetry and production telemetry |
-| Phase 9: UI experience | Medium | 📋 Planned | Blazor dashboard and user experience |
-| Phase 10: DevOps | Medium | 📋 Planned | Build, automation, and deployment pipelines |
+| Phase | Status | Outcome |
+| --- | --- | --- |
+| Phase 1: API Foundation | ✅ Completed | Stable API scaffold, Swagger, and health checks |
+| Phase 2: PostgreSQL Foundation | ✅ Completed | PostgreSQL + EF Core + migration-ready data layer |
+| Phase 3: Document Pipeline | 📋 Planned | Document ingestion and processing |
+| Phase 4: Vector Search | 📋 Planned | Embeddings and retrieval layer |
+| Phase 5: RAG Orchestration | 📋 Planned | Retrieval and generation workflow |
+| Phase 6: Azure Integration | 📋 Planned | Foundry and OpenAI connectivity |
+| Phase 7: Experience and Operations | 📋 Planned | UI, observability, and deployment |
 
 ## Implemented Features
 
 ### ✅ Completed
 
-- ASP.NET Core Web API project initialized
-- Solution and project structure established
-- Swagger/OpenAPI enabled for API documentation
-- Controller-based routing configured
-- HTTPS configuration enabled
-- Initial architecture defined for future expansion
-- GitHub repository initialized for portfolio visibility
+- ASP.NET Core Web API initialized and configured
+- Swagger/OpenAPI enabled for service exploration
+- Health endpoint implemented and validated
+- PostgreSQL connection string configured
+- Entity Framework Core registered in dependency injection
+- ApplicationDbContext created for persistence
+- Document model implemented with Guid identifier and timestamp
+- Initial migration generated and applied successfully
+- Docker Compose configured for PostgreSQL startup
+- Database connectivity validated with health checks
 
-### 🚧 In Progress
+### 📋 Not Included in This Milestone
 
-- Health API endpoint refinement
-- API foundation stabilization
-- Service-layer consistency checks
-- Baseline application conventions and structure
-
-## Planned Features
-
-### 📋 Planned Core Features
-
-- PostgreSQL integration
-- Entity Framework Core setup and migrations
-- Document upload and management endpoints
-- Chunking service for knowledge segmentation
-- pgvector implementation for vector storage
-- Embedding generation services
-- Semantic and hybrid search capability
-- Retrieval-Augmented Generation workflow
-- Agent orchestration layer
-- GraphRAG exploration and knowledge graph capabilities
-- Azure AI Foundry connectivity
-- Azure OpenAI integration
-- OpenTelemetry observability pipeline
-- Copilot Studio business workflow integration
-- Blazor-based interface for the end-user experience
-- CI/CD automation with GitHub Actions
-- Docker-based environment support
+- RAG retrieval logic
+- AI provider integration
+- Semantic Kernel orchestration
+- Vector search and pgvector workflows
+- Repository pattern beyond the database foundation
+- Business document services
+- UI layer
 
 ## Project Structure
 
@@ -168,141 +144,67 @@ The project has established the initial application foundation and is moving tow
 RagPlatform/
 ├── README.md
 ├── RagPlatform.slnx
+├── docker-compose.yml
 ├── RagPlatform.Api/
 │   ├── Contracts/
 │   ├── Controllers/
 │   ├── Data/
+│   │   ├── Migrations/
+│   │   └── ApplicationDbContext.cs
 │   ├── Models/
+│   │   ├── Document.cs
+│   │   └── HealthStatusResponse.cs
 │   ├── Services/
+│   │   └── HealthService.cs
 │   ├── Properties/
 │   ├── Program.cs
+│   ├── appsettings.json
 │   └── RagPlatform.Api.csproj
-├── .github/
-│   └── workflows/
-├── docker/
-├── docs/
-├── scripts/
-└── tests/
+├── .gitignore
+└── .github/
 ```
 
-## Getting Started
+## Development Setup
 
 ### Prerequisites
 
-- .NET 10 SDK
-- Visual Studio 2026 or later, or VS Code with C# support
+- .NET SDK
+- Docker Desktop
+- PostgreSQL client tools (optional)
 - Git
-- Docker (planned for later stages)
-- PostgreSQL (planned)
-- Azure subscription for AI services (planned)
 
-### Run the API locally
+### Run PostgreSQL locally
+
+```bash
+docker compose up -d
+```
+
+### Run the API
 
 ```bash
 dotnet restore
-
 dotnet build
-
 dotnet run --project RagPlatform.Api/RagPlatform.Api.csproj
 ```
 
-### Swagger UI
-
-Once the API is running, Swagger can be accessed at:
+### Access Swagger
 
 ```text
-https://localhost:7085/swagger
+https://localhost:<port>/swagger
 ```
 
-or
+If the app is running with local ASP.NET defaults, Swagger is available through the configured HTTPS port provided by the development environment.
 
-```text
-http://localhost:5172/swagger
-```
+## Current Focus
 
-## Current Sprint
+The current milestone is intentionally narrow and stable:
 
-### Sprint Objective
+- validate the API foundation
+- ensure PostgreSQL connectivity works locally
+- establish EF Core modeling conventions
+- prepare the data layer for future document and retrieval features
 
-Establish a stable, extensible API foundation that supports future RAG and AI services without compromising maintainability.
-
-### Current Focus
-
-- Stabilize base API contract and controller model
-- Validate .NET 10 API runtime behavior
-- Confirm architecture conventions for future service layers
-- Prepare the project for database and AI integration work
-
-### Sprint Deliverables
-
-- ✅ API project scaffold
-- ✅ Swagger documentation enabled
-- ✅ HTTPS-enabled startup configuration
-- 🚧 Health endpoint validation
-- 🚧 Service architecture stabilization
-
-## Future Milestones
-
-### Milestone 1: Data and Persistence Foundation
-
-- PostgreSQL project integration
-- Entity Framework Core adoption
-- Initial migrations and schema design
-- Data service abstraction
-
-### Milestone 2: RAG Core Engine
-
-- Document management APIs
-- Chunking and indexing pipeline
-- Embeddings generation
-- Vector similarity search
-
-### Milestone 3: AI Orchestration
-
-- Semantic Kernel integration
-- Retrieval workflows and prompt orchestration
-- Agent patterns and orchestration logic
-- GraphRAG enhancement
-
-### Milestone 4: Azure Integration
-
-- Azure AI Foundry integration
-- Azure OpenAI model connectivity
-- Governance and secure configuration patterns
-- Cloud deployment considerations
-
-### Milestone 5: Experience and Operations
-
-- Blazor UI implementation
-- Observability and telemetry with OpenTelemetry
-- CI/CD automation with GitHub Actions
-- Production readiness review
-
-## Learning Objectives
-
-This project is intended to provide hands-on learning in:
-
-- Modern ASP.NET Core Web API design
-- Layered software architecture for enterprise systems
-- AI application integration patterns
-- Retrieval-augmented generation approaches
-- Vector database strategies with pgvector
-- Secure configuration and Azure service integration
-- Observability and operational model design
-- Portfolio quality documentation and engineering communication
-
-## Portfolio Value
-
-RAG Platform 2.0 is designed as a portfolio-grade solution demonstrating the ability to bridge software engineering and AI application design. It is relevant to hiring managers, solution architects, and senior engineering reviewers because it reflects:
-
-- Strong architectural thinking
-- Clear project progression from foundation to platform scale
-- Real-world AI engineering patterns
-- Microsoft technology alignment
-- Understandable and communicable technical decision-making
-- Readiness for enterprise modernization and AI platform initiatives
-
-The project is intentionally positioned as a platform narrative: from a minimal but stable API foundation to a future-ready AI ecosystem.
+The project is not yet implementing AI, retrieval, or RAG workflows. Those remain future milestones.
 
 ## License
 
@@ -332,10 +234,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
----
-
 ## Summary
 
-RAG Platform 2.0 represents a thoughtful, modern AI engineering portfolio project that balances technical ambition with practical architectural discipline. It demonstrates the path from a clean API foundation to a future-ready knowledge platform powered by retrieval, semantic search, and AI orchestration capabilities.
-
-This README is written to communicate credible engineering progress, honest maturity, and a clear roadmap for long-term platform evolution.
+RAG Platform 2.0 has successfully established the API and PostgreSQL foundation required for the next stage of platform development. The project is now aligned with the roadmap and prepared to extend into document processing, vector search, and AI orchestration without introducing premature scope beyond the current milestone.
