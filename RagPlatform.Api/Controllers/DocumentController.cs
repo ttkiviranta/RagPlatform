@@ -80,6 +80,35 @@ public sealed class DocumentController : ControllerBase
     }
 
     /// <summary>
+    /// Uploads a text-based document and stores its content and metadata.
+    /// </summary>
+    /// <param name="request">The uploaded file request.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The uploaded document.</returns>
+    [HttpPost("upload")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(Document), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<Document>> UploadAsync([FromForm] DocumentUploadRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        try
+        {
+            var document = await _documentService.UploadTextDocumentAsync(request.File, cancellationToken);
+            return StatusCode(StatusCodes.Status201Created, document);
+        }
+        catch (ArgumentException ex)
+        {
+            ModelState.AddModelError(ex.ParamName ?? nameof(DocumentUploadRequest.File), ex.Message);
+            return ValidationProblem(ModelState);
+        }
+    }
+
+    /// <summary>
     /// Updates an existing document.
     /// </summary>
     /// <param name="id">The document identifier.</param>
