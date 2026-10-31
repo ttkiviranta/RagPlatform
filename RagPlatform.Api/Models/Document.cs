@@ -15,4 +15,6 @@ public sealed class Document
     public long FileSize { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public DocumentMetadata? Metadata { get; set; }
 }

@@ -34,7 +34,8 @@ namespace RagPlatform.Api.Data.Migrations
 
                     b.Property<string>("ContentType")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -43,7 +44,8 @@ namespace RagPlatform.Api.Data.Migrations
 
                     b.Property<string>("FileName")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
 
                     b.Property<long>("FileSize")
                         .HasColumnType("bigint");
@@ -56,6 +58,63 @@ namespace RagPlatform.Api.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Documents");
+                });
+
+            modelBuilder.Entity("RagPlatform.Api.Models.DocumentMetadata", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("CharacterCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<int>("LineCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ProcessedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int>("WordCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocumentId")
+                        .IsUnique();
+
+                    b.ToTable("DocumentMetadata");
+                });
+
+            modelBuilder.Entity("RagPlatform.Api.Models.DocumentMetadata", b =>
+                {
+                    b.HasOne("RagPlatform.Api.Models.Document", "Document")
+                        .WithOne("Metadata")
+                        .HasForeignKey("RagPlatform.Api.Models.DocumentMetadata", "DocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Document");
+                });
+
+            modelBuilder.Entity("RagPlatform.Api.Models.Document", b =>
+                {
+                    b.Navigation("Metadata");
                 });
 #pragma warning restore 612, 618
         }

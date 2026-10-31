@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using RagPlatform.Api.Contracts.Documents;
 using RagPlatform.Api.Contracts.Health;
+using RagPlatform.Api.Contracts.Processing;
 using RagPlatform.Api.Data;
 using RagPlatform.Api.Services;
 
@@ -41,6 +42,9 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.AddScoped<IHealthService, HealthService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<IPlainTextProcessor, PlainTextProcessor>();
+builder.Services.AddScoped<IMarkdownProcessor, MarkdownProcessor>();
+builder.Services.AddScoped<DocumentProcessingService>();
 
 var app = builder.Build();
 
