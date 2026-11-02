@@ -1,140 +1,202 @@
-﻿# RAG Platform 2.0
+# RAG Platform 2.0
 
-A modern .NET-based Retrieval-Augmented Generation platform built with a clean and incremental architecture.
+A portfolio project built to demonstrate a disciplined, phased approach to building a Retrieval-Augmented Generation platform with .NET, PostgreSQL, Entity Framework Core, and future AI integration points.
 
 ## Project Overview
 
-RAG Platform 2.0 is a portfolio project focused on building a practical AI application foundation using the Microsoft .NET ecosystem. The solution currently emphasizes a stable API layer, PostgreSQL persistence, and document management capabilities, while keeping the scope intentionally narrow and production-oriented.
+RAG Platform 2.0 is a structured, milestone-based solution designed to evolve from a clean API foundation into a future-ready RAG architecture. The project intentionally keeps scope narrow and production-oriented during each phase so the underlying foundation remains stable before introducing heavier AI and retrieval features.
 
-The current milestone is focused on document CRUD operations only. AI, vector search, and retrieval workflows remain future phases.
+The current implementation covers the document lifecycle, PostgreSQL persistence, document processing, web ingestion, chunk preparation, and embedding architecture.
 
-## Current Phase
+## Current Status
 
-### Phase 3: Document Management API
+The project has successfully completed the following phases:
 
-This milestone introduces a complete CRUD API for Document entities, using ASP.NET Core, Entity Framework Core, PostgreSQL, and dependency-injected services.
+### Completed Phases
 
-Completed in this milestone:
+- Phase 1: API Foundation
+- Phase 2: PostgreSQL Foundation
+- Phase 3: Document Management API
+- Phase 4A: Document Upload Foundation
+- Phase 4B: Document Processing Foundation
+- Phase 5A: Web Content Ingestion
+- Phase 5B: Chunking Foundation
+- Phase 6: Embeddings Foundation
 
-- ASP.NET Core Web API
-- Swagger/OpenAPI
-- Health endpoint
-- PostgreSQL + EF Core persistence foundation
-- Document entity and DbSet
-- ApplicationDbContext configuration
-- Document service contract and implementation
-- Document controller with CRUD endpoints
-- Validation for required title and content fields
-- XML comments for Swagger documentation
+### In Progress
 
-Not yet implemented:
+- None at the moment
 
-- RAG pipeline
-- AI orchestration
-- Azure AI Foundry integration
-- Azure OpenAI integration
-- Semantic Kernel integration
-- pgvector or semantic retrieval
-- File ingestion and chunking services
-- Blazor UI
+### Planned Phases
+
+- Phase 7: Vector Search Foundation
+- Phase 8: Semantic Search
+- Phase 9: Basic RAG
+- Phase 10: Azure AI Foundry Integration
+- Phase 11: Copilot Studio Integration
+- Phase 12: GraphRAG
+
+## Project Progress
+
+| Metric | Status |
+| --- | --- |
+| Completed phases | 6 / 12 |
+| In-progress phases | 0 |
+| Planned phases | 6 |
+| Architecture maturity | Foundation ready for vector and retrieval work |
+
+## Implemented Features
+
+- ASP.NET Core Web API with Swagger/OpenAPI
+- PostgreSQL integration
+- Entity Framework Core persistence layer
+- Document CRUD API
+- Text document upload support for `.txt` and `.md`
+- Document processing metadata service
+- Web content ingestion from public URLs
+- HTML extraction and normalization with HtmlAgilityPack
+- Chunk generation service and controller
+- Document chunk storage and retrieval
+- Embedding architecture with provider abstraction
+- Placeholder embedding provider for future vendor integrations
+- Dependency injection-based service composition
+- API documentation through XML comments and Swagger
 
 ## Architecture Overview
 
-The current architecture is intentionally small and maintainable:
+The platform is intentionally structured as a layered application that supports iterative feature delivery without coupling the system to vendor-specific AI dependencies too early.
 
-- API layer: ASP.NET Core Web API
-- Data access: Entity Framework Core with PostgreSQL
-- Service layer: Document business logic and validation
-- Controller layer: thin API endpoints only
-- Persistence model: Document entity stored in the Documents table
+### Current Architecture Layers
 
-This keeps the current milestone aligned with the roadmap while preserving a clean foundation for future retrieval and AI features.
+- API layer: ASP.NET Core Web API controllers
+- Service layer: document, processing, web ingestion, chunking, and embedding services
+- Data layer: Entity Framework Core with PostgreSQL
+- Persistence model: documents, metadata, chunks, and embedding metadata
+- Provider abstraction: future embedding providers for Azure AI Foundry, Azure OpenAI, OpenAI, or local models
 
-## Current Project Status
+This keeps the solution maintainable, testable, and aligned with a staged roadmap for intelligent document retrieval.
 
-| Area | Status | Notes |
-| --- | --- | --- |
-| Solution structure | ✅ Completed | Base project structure established |
-| ASP.NET Core API foundation | ✅ Completed | API is running and exposed through Swagger |
-| Swagger/OpenAPI | ✅ Completed | Endpoints documented and visible |
-| Health endpoint | ✅ Completed | API health checks are available |
-| PostgreSQL integration | ✅ Completed | PostgreSQL is configured and connected |
-| Entity Framework Core | ✅ Completed | DB context and persistence are in place |
-| Document CRUD API | ✅ Completed | Create, read, update, and delete workflow is implemented |
-| Validation | ✅ Completed | Title and content are required |
-| pgvector / vector search | 📋 Planned | Not part of this milestone |
-| AI / RAG integration | 📋 Planned | Future phases |
-| UI | 📋 Planned | Future phases |
+## Embeddings Foundation
+
+Phase 6 establishes the abstraction required for future embedding workflows without yet integrating a concrete AI provider.
+
+### Included in the Embeddings Foundation
+
+- `DocumentEmbedding` entity
+- `IEmbeddingProvider` interface
+- `IEmbeddingService` interface
+- `EmbeddingService` placeholder implementation
+- `PlaceholderEmbeddingProvider`
+- `EmbeddingController`
+- EF Core persistence for embedding metadata records
+- provider-ready design that supports future Azure AI Foundry, Azure OpenAI, OpenAI, and local model integration
+
+### Design Principles
+
+- Dependency injection
+- SOLID-compatible service boundaries
+- Async/await-based workflow
+- ILogger support
+- No production AI calls yet
+- No pgvector implementation yet
+- No semantic search or RAG orchestration yet
+
+## Roadmap
+
+| Phase | Name | Status | Description |
+| --- | --- | --- | --- |
+| Phase 1 | API Foundation | ✅ Completed | ASP.NET Core API, Swagger, and health configuration |
+| Phase 2 | PostgreSQL Foundation | ✅ Completed | EF Core and PostgreSQL setup |
+| Phase 3 | Document Management API | ✅ Completed | Document CRUD operations |
+| Phase 4A | Document Upload Foundation | ✅ Completed | Text-based file ingestion |
+| Phase 4B | Document Processing Foundation | ✅ Completed | Metadata generation and document processing |
+| Phase 5A | Web Content Ingestion | ✅ Completed | URL import and HTML extraction |
+| Phase 5B | Chunking Foundation | ✅ Completed | Chunk creation, metadata, and storage |
+| Phase 6 | Embeddings Foundation | ✅ Completed | Embedding provider architecture and metadata persistence |
+| Phase 7 | Vector Search Foundation | 📋 Planned | Vector storage and similarity foundations |
+| Phase 8 | Semantic Search | 📋 Planned | Semantic matching and ranking work |
+| Phase 9 | Basic RAG | 📋 Planned | Retrieval + prompting workflow |
+| Phase 10 | Azure AI Foundry Integration | 📋 Planned | Foundry integration and orchestration |
+| Phase 11 | Copilot Studio Integration | 📋 Planned | Copilot Studio experience and connectors |
+| Phase 12 | GraphRAG | 📋 Planned | Graph-based retrieval augmentation |
 
 ## Technology Stack
 
-### Core Platform
+### Core Technologies
 
-- ASP.NET Core Web API
-- .NET 10
-- Swagger/OpenAPI
+- ASP.NET Core 10
+- PostgreSQL
 - Entity Framework Core
 - Npgsql
-- PostgreSQL
+- Swagger/OpenAPI
+- HTML parsing with HtmlAgilityPack
 
-### Current Domain Focus
+### Implemented Capabilities
 
-- Document entity persistence
-- CRUD API layer
-- DI-based service architecture
-- Async database access
-- Structured validation
+- Chunking services
+- Embedding architecture
+- Document lifecycle workflows
+- Web ingestion services
+- Database-backed persistence
 
-## Roadmap Status
+## API Endpoints
 
-| Phase | Status | Outcome |
-| --- | --- | --- |
-| Phase 1: API Foundation | ✅ Completed | API scaffold, Swagger, and health checks |
-| Phase 2: PostgreSQL Foundation | ✅ Completed | EF Core and PostgreSQL foundation ready |
-| Phase 3: Document Management API | ✅ Completed | CRUD API for documents |
-| Phase 4: Document Processing | 📋 Planned | File ingestion and document workflow expansion |
-| Phase 5: Vector Search | 📋 Planned | Embeddings, retrieval, and indexing |
-| Phase 6: RAG Orchestration | 📋 Planned | Prompt and retrieval pipeline |
-| Phase 7: Azure Integration | 📋 Planned | Azure AI Foundry and OpenAI integration |
-
-## Endpoints
-
-### Document API
+### Document APIs
 
 - GET /api/documents
 - GET /api/documents/{id}
 - POST /api/documents
 - PUT /api/documents/{id}
 - DELETE /api/documents/{id}
+- POST /api/documents/upload
+
+### Processing APIs
+
+- POST /api/documents/{id}/process
+- GET /api/documents/{id}/metadata
+
+### Web Import APIs
+
+- POST /api/web/import
+
+### Chunking APIs
+
+- POST /api/documents/{id}/chunks
+- GET /api/documents/{id}/chunks
+- GET /api/chunks/{id}
+
+### Embedding APIs
+
+- POST /api/chunks/{id}/embeddings
+- GET /api/chunks/{id}/embeddings
 
 ## Development Setup
 
 ### Prerequisites
 
 - .NET SDK
-- Docker Desktop
-- PostgreSQL running locally
+- PostgreSQL instance
 - Git
+- Optional: Docker Desktop for local infrastructure support
 
 ### Run the API
 
 ```bash
 dotnet restore
 dotnet build
+dotnet ef database update --project RagPlatform.Api --startup-project RagPlatform.Api
 dotnet run --project RagPlatform.Api/RagPlatform.Api.csproj
 ```
 
-### Swagger UI
-
-Open the Swagger UI in the browser at the local ASP.NET URL generated for the app, for example:
+### Open Swagger
 
 ```text
-http://localhost:5129/swagger
+https://localhost:5078/swagger
 ```
 
 ## Summary
 
-The project is now aligned with the roadmap for a clean and maintainable document management layer. The implementation remains intentionally scoped to CRUD and persistence without introducing AI, vector retrieval, or RAG features prematurely.
+RAG Platform 2.0 has reached a mature foundation stage. The solution currently includes reliable API, persistence, document processing, web ingestion, chunking, and embedding architecture patterns. The next strategic milestone is vector search and retrieval enablement, while still preserving a clean and extensible architecture for future Azure AI and orchestration layers.
 
 ## License
 
