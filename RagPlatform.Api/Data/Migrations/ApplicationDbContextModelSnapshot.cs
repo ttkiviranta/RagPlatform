@@ -50,6 +50,13 @@ namespace RagPlatform.Api.Data.Migrations
                     b.Property<long>("FileSize")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("SourceUrl")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasDefaultValue("");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)

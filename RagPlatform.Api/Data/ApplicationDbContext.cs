@@ -32,6 +32,9 @@ public sealed class ApplicationDbContext : DbContext
                 .HasMaxLength(200);
             entity.Property(document => document.FileSize)
                 .IsRequired();
+            entity.Property(document => document.SourceUrl)
+                .HasMaxLength(2048)
+                .HasDefaultValue(string.Empty);
             entity.Property(document => document.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasOne(document => document.Metadata)
