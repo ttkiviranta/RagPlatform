@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using Microsoft.EntityFrameworkCore;
+using RagPlatform.Api.Contracts.Chunking;
 using RagPlatform.Api.Contracts.Documents;
 using RagPlatform.Api.Contracts.Health;
 using RagPlatform.Api.Contracts.Processing;
@@ -51,6 +52,7 @@ builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IPlainTextProcessor, PlainTextProcessor>();
 builder.Services.AddScoped<IMarkdownProcessor, MarkdownProcessor>();
 builder.Services.AddScoped<IWebContentService, WebContentService>();
+builder.Services.AddScoped<IDocumentChunkingService, DocumentChunkingService>();
 builder.Services.AddScoped<DocumentProcessingService>();
 
 var app = builder.Build();

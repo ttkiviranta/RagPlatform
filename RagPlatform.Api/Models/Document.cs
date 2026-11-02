@@ -1,3 +1,5 @@
+﻿using System.Text.Json.Serialization;
+
 namespace RagPlatform.Api.Models;
 
 public sealed class Document
@@ -18,5 +20,9 @@ public sealed class Document
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    [JsonIgnore]
     public DocumentMetadata? Metadata { get; set; }
+
+    [JsonIgnore]
+    public ICollection<DocumentChunk> Chunks { get; set; } = new List<DocumentChunk>();
 }

@@ -14,6 +14,8 @@ public sealed class ApplicationDbContext : DbContext
 
     public DbSet<DocumentMetadata> DocumentMetadata => Set<DocumentMetadata>();
 
+    public DbSet<DocumentChunk> DocumentChunks => Set<DocumentChunk>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -41,6 +43,10 @@ public sealed class ApplicationDbContext : DbContext
                 .WithOne(metadata => metadata.Document)
                 .HasForeignKey<DocumentMetadata>(metadata => metadata.DocumentId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(document => document.Chunks)
+                .WithOne(chunk => chunk.Document)
+                .HasForeignKey(chunk => chunk.DocumentId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<DocumentMetadata>(entity =>
@@ -63,6 +69,23 @@ public sealed class ApplicationDbContext : DbContext
             entity.Property(metadata => metadata.ProcessedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(metadata => metadata.DocumentId)
+                .IsUnique();
+        });
+
+        modelBuilder.Entity<DocumentChunk>(entity =>
+        {
+            entity.HasKey(chunk => chunk.Id);
+            entity.Property(chunk => chunk.DocumentId)
+                .IsRequired();
+            entity.Property(chunk => chunk.ChunkIndex)
+                .IsRequired();
+            entity.Property(chunk => chunk.Content)
+                .IsRequired();
+            entity.Property(chunk => chunk.CharacterCount)
+                .IsRequired();
+            entity.Property(chunk => chunk.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.HasIndex(chunk => new { chunk.DocumentId, chunk.ChunkIndex })
                 .IsUnique();
         });
     }

@@ -1,3 +1,5 @@
+﻿using System.Text.Json.Serialization;
+
 namespace RagPlatform.Api.Models;
 
 public sealed class DocumentMetadata
@@ -6,6 +8,7 @@ public sealed class DocumentMetadata
 
     public Guid DocumentId { get; set; }
 
+    [JsonIgnore]
     public Document Document { get; set; } = default!;
 
     public string FileName { get; set; } = string.Empty;
