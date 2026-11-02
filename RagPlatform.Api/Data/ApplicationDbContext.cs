@@ -16,6 +16,8 @@ public sealed class ApplicationDbContext : DbContext
 
     public DbSet<DocumentChunk> DocumentChunks => Set<DocumentChunk>();
 
+    public DbSet<DocumentEmbedding> DocumentEmbeddings => Set<DocumentEmbedding>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -86,6 +88,26 @@ public sealed class ApplicationDbContext : DbContext
             entity.Property(chunk => chunk.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(chunk => new { chunk.DocumentId, chunk.ChunkIndex })
+                .IsUnique();
+            entity.HasMany(chunk => chunk.Embeddings)
+                .WithOne(embedding => embedding.Chunk)
+                .HasForeignKey(embedding => embedding.ChunkId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DocumentEmbedding>(entity =>
+        {
+            entity.HasKey(embedding => embedding.Id);
+            entity.Property(embedding => embedding.ChunkId)
+                .IsRequired();
+            entity.Property(embedding => embedding.VectorDimensions)
+                .IsRequired();
+            entity.Property(embedding => embedding.ModelName)
+                .IsRequired()
+                .HasMaxLength(200);
+            entity.Property(embedding => embedding.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.HasIndex(embedding => new { embedding.ChunkId, embedding.ModelName })
                 .IsUnique();
         });
     }

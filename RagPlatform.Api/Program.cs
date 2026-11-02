@@ -2,10 +2,12 @@
 using Microsoft.EntityFrameworkCore;
 using RagPlatform.Api.Contracts.Chunking;
 using RagPlatform.Api.Contracts.Documents;
+using RagPlatform.Api.Contracts.Embeddings;
 using RagPlatform.Api.Contracts.Health;
 using RagPlatform.Api.Contracts.Processing;
 using RagPlatform.Api.Contracts.Web;
 using RagPlatform.Api.Data;
+using RagPlatform.Api.Providers;
 using RagPlatform.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -53,6 +55,8 @@ builder.Services.AddScoped<IPlainTextProcessor, PlainTextProcessor>();
 builder.Services.AddScoped<IMarkdownProcessor, MarkdownProcessor>();
 builder.Services.AddScoped<IWebContentService, WebContentService>();
 builder.Services.AddScoped<IDocumentChunkingService, DocumentChunkingService>();
+builder.Services.AddScoped<IEmbeddingProvider, PlaceholderEmbeddingProvider>();
+builder.Services.AddScoped<IEmbeddingService, EmbeddingService>();
 builder.Services.AddScoped<DocumentProcessingService>();
 
 var app = builder.Build();

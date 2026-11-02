@@ -99,6 +99,36 @@ namespace RagPlatform.Api.Data.Migrations
                     b.ToTable("DocumentChunks");
                 });
 
+            modelBuilder.Entity("RagPlatform.Api.Models.DocumentEmbedding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ChunkId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("ModelName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("VectorDimensions")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChunkId", "ModelName")
+                        .IsUnique();
+
+                    b.ToTable("DocumentEmbeddings");
+                });
+
             modelBuilder.Entity("RagPlatform.Api.Models.DocumentMetadata", b =>
                 {
                     b.Property<Guid>("Id")
@@ -151,6 +181,17 @@ namespace RagPlatform.Api.Data.Migrations
                     b.Navigation("Document");
                 });
 
+            modelBuilder.Entity("RagPlatform.Api.Models.DocumentEmbedding", b =>
+                {
+                    b.HasOne("RagPlatform.Api.Models.DocumentChunk", "Chunk")
+                        .WithMany("Embeddings")
+                        .HasForeignKey("ChunkId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Chunk");
+                });
+
             modelBuilder.Entity("RagPlatform.Api.Models.DocumentMetadata", b =>
                 {
                     b.HasOne("RagPlatform.Api.Models.Document", "Document")
@@ -167,6 +208,11 @@ namespace RagPlatform.Api.Data.Migrations
                     b.Navigation("Chunks");
 
                     b.Navigation("Metadata");
+                });
+
+            modelBuilder.Entity("RagPlatform.Api.Models.DocumentChunk", b =>
+                {
+                    b.Navigation("Embeddings");
                 });
 #pragma warning restore 612, 618
         }

@@ -18,4 +18,7 @@ public sealed class DocumentChunk
     public int CharacterCount { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [JsonIgnore]
+    public ICollection<DocumentEmbedding> Embeddings { get; set; } = new List<DocumentEmbedding>();
 }
