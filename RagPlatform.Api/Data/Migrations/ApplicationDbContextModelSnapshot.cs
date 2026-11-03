@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using Pgvector;
 using RagPlatform.Api.Data;
 
 #nullable disable
@@ -20,6 +21,7 @@ namespace RagPlatform.Api.Data.Migrations
                 .HasAnnotation("ProductVersion", "10.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "vector");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("RagPlatform.Api.Models.Document", b =>
@@ -112,6 +114,10 @@ namespace RagPlatform.Api.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Vector>("EmbeddingVector")
+                        .IsRequired()
+                        .HasColumnType("vector");
 
                     b.Property<string>("ModelName")
                         .IsRequired()

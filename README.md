@@ -1,22 +1,24 @@
-﻿# RAG Platform 2.0
+# RAG Platform 2.0
 
-A portfolio-grade .NET platform for building a retrieval-first, AI-ready knowledge system. This project demonstrates disciplined backend engineering, phased delivery, and a clear path from document ingestion to semantic retrieval, enterprise AI integration, and agent-driven experiences.
+A portfolio-grade .NET platform for building a retrieval-first, AI-enabled knowledge system. This project demonstrates disciplined backend engineering, phased delivery, and a practical path from document ingestion to vector-based retrieval, enterprise observability, and future AI orchestration.
 
 ## Project Overview
 
-RAG Platform 2.0 is a modular .NET-based application designed to manage the lifecycle of organizational knowledge from ingestion through preparation, retrieval, and future AI-powered answer generation. The project follows a milestone-driven roadmap so each phase remains focused, testable, and aligned to real architecture needs.
+RAG Platform 2.0 is a modular ASP.NET Core API designed to manage the lifecycle of organizational knowledge from ingestion through preparation, retrieval, and future AI-powered answer generation. The project follows a milestone-driven roadmap so every phase remains focused, testable, and aligned with real engineering requirements.
 
 This repository is intended to showcase:
 
 - ASP.NET Core Web API architecture
-- PostgreSQL persistence and EF Core modeling
-- Document ingestion and metadata processing
-- Web content import and HTML normalization
-- Content chunking for future retrieval flows
-- Embedding infrastructure for future model providers
-- A clean evolution path toward semantic search and RAG
+- PostgreSQL persistence with Entity Framework Core
+- Document lifecycle and metadata handling
+- Web content ingestion and HTML normalization
+- Content chunking for retrieval preparation
+- Embedding persistence and vector-ready storage
+- pgvector-powered retrieval foundations
+- Azure Application Insights and OpenTelemetry readiness
+- Secure local configuration via .NET User Secrets
 
-The solution is built as a professional portfolio project appropriate for recruiters, architects, and senior engineers evaluating backend architecture, system design, and phased AI platform delivery.
+The solution is built as a professional portfolio project for recruiters, architects, and senior engineers evaluating backend architecture, cloud-ready design, and staged AI platform delivery.
 
 ## Current Status
 
@@ -32,10 +34,12 @@ The project has completed the following phases:
 - ✅ Phase 5A - Web Content Ingestion
 - ✅ Phase 5B - Chunking Foundation
 - ✅ Phase 6 - Embeddings Foundation
+- ✅ Phase 7 - Vector Search Foundation
+- ✅ Phase 8 - Observability Foundation
 
 ### Current implementation status
 
-This solution currently includes:
+The solution currently includes:
 
 - ASP.NET Core Web API
 - Swagger / OpenAPI
@@ -43,55 +47,56 @@ This solution currently includes:
 - Entity Framework Core migrations
 - Health endpoint
 - Document CRUD operations
-- Document file upload and validation
+- Document upload and validation
 - Document processing and metadata extraction
 - Web content import via URL
 - Document chunk generation and persistence
-- Embedding foundation abstraction and persistence
-- SourceUrl tracking
-- Metadata storage
-- Database migration support
-
-### Current maturity
-
-The project is no longer in an early scaffold stage. It is now a functional backend foundation with real document lifecycle and retrieval-preparation capabilities. It is not yet a full RAG system, but it is ready for the next phase of vector and retrieval work.
+- Embedding abstraction and storage
+- pgvector-backed vector storage
+- Similarity search foundation
+- Azure Application Insights integration
+- OpenTelemetry tracing and metrics
+- User Secrets-based secure configuration
 
 ## Architecture Overview
 
-The platform follows a layered and modular design that keeps the system testable, extensible, and vendor-agnostic in its early stages.
+The project follows a layered, modular design that keeps the system maintainable, testable, and ready for future enterprise AI features.
 
 ### Current architecture layers
 
-- API layer: ASP.NET Core controllers for documents, processing, web ingestion, chunking, and embedding foundation endpoints
-- Application layer: service-based business logic for uploads, processing, source import, chunk creation, and future embedding workflow orchestration
-- Data layer: PostgreSQL + Entity Framework Core
-- Domain layer: document entities, metadata, chunks, and embedding metadata models
-- Provider abstraction: embedding interfaces designed to support future AI providers without hard coupling
+- API layer: controllers for documents, processing, web ingestion, chunking, embeddings, search, and telemetry
+- Application layer: service-first business logic for uploads, processing, chunk generation, vector retrieval, and monitoring
+- Data layer: PostgreSQL + Entity Framework Core + pgvector
+- Domain layer: document entities, metadata, chunk records, embedding records, and search contracts
+- Integration layer: telemetry pipeline based on Azure Application Insights and OpenTelemetry
+- Configuration layer: secure local configuration using .NET User Secrets
 
 ### Design principles
 
 - Separation of concerns
 - Dependency injection throughout the API
-- Thin controllers and service-first business logic
+- Thin controllers and service-driven business logic
 - Async/await-first implementation patterns
-- Data persistence via EF Core and PostgreSQL
-- Future-ready abstractions for AI and retrieval systems
-- No premature vendor coupling to Azure AI or RAG layers
-
-This architecture keeps the project maintainable while supporting a controlled progression toward enterprise AI features.
+- EF Core-first persistence model
+- Explicit abstraction for provider-agnostic embedding and retrieval work
+- Clean evolution path toward semantic search and RAG
+- Security-focused local configuration management
 
 ## Technology Stack
 
-### Core stack
+### Core platform
 
 - ASP.NET Core 10
 - C#
 - PostgreSQL
 - Entity Framework Core
 - Npgsql
+- pgvector
 - Swagger / OpenAPI
 - HtmlAgilityPack
-- .NET SDK
+- Azure Application Insights
+- OpenTelemetry
+- .NET User Secrets
 
 ### Current capabilities delivered
 
@@ -100,8 +105,10 @@ This architecture keeps the project maintainable while supporting a controlled p
 - HTML content import
 - Metadata extraction and persistence
 - Content chunk creation and storage
-- Embedding foundation architecture
-- Database migrations and schema evolution
+- Embedding persistence architecture
+- Vector storage and retrieval foundation
+- Telemetry and monitoring foundation
+- Secure local secret configuration
 
 ## Implemented Features
 
@@ -110,13 +117,13 @@ This architecture keeps the project maintainable while supporting a controlled p
 - Create, read, update, and delete documents
 - Document metadata persistence
 - Structured document storage in PostgreSQL
-- Association between documents and metadata
+- Relationship mapping between documents and metadata
 
 ### Upload and processing
 
-- File upload foundation for text-based content
+- File upload foundation for text-based document content
 - Input validation and file metadata capture
-- Content type and size tracking
+- Content type and file size tracking
 - Processing endpoints for derived document metadata
 
 ### Web content ingestion
@@ -126,7 +133,7 @@ This architecture keeps the project maintainable while supporting a controlled p
 - Extracts page title and main content
 - Removes boilerplate HTML and unnecessary page elements
 - Stores source URL and document metadata
-- Persists the imported content as a document object
+- Persists imported content as a document record
 
 ### Chunking foundation
 
@@ -134,20 +141,39 @@ This architecture keeps the project maintainable while supporting a controlled p
 - Supports configurable chunk size and overlap
 - Preserves sentence boundaries when possible
 - Stores generated chunk content and metadata
-- Prevents duplicate generation for the same document content set
+- Prevents duplicate chunk generation for the same document content set
 - Associates chunks with their parent document
 
 ### Embeddings foundation
 
 - Embedding metadata entity implemented
-- Provider abstraction for future model providers
-- Service and controller patterns for future embedding workflows
+- Provider abstraction for future AI model providers
+- Service and controller patterns for embedding workflows
 - Database persistence for embedding metadata
-- No production AI provider calls yet
+- Vector-ready storage design
+
+### Vector search foundation
+
+- PostgreSQL pgvector integration
+- EmbeddingVector storage in the database
+- Similarity search readiness
+- Top-K retrieval patterns
+- Search result metadata and similarity scoring
+- Search-specific telemetry integration
+
+### Observability foundation
+
+- Azure Application Insights integration
+- OpenTelemetry tracing and metrics
+- ASP.NET Core instrumentation
+- HTTP instrumentation
+- SQL instrumentation
+- Structured logging readiness
+- Monitoring hooks for API, database, embedding, and search telemetry
 
 ## API Capabilities
 
-The current API already exposes the following capabilities:
+The current API exposes the following capabilities:
 
 ### Document APIs
 
@@ -163,7 +189,7 @@ The current API already exposes the following capabilities:
 - POST /api/documents/{id}/process
 - GET /api/documents/{id}/metadata
 
-### Web ingestion API
+### Web ingestion APIs
 
 - POST /api/web/import
 
@@ -173,16 +199,19 @@ The current API already exposes the following capabilities:
 - GET /api/documents/{id}/chunks
 - GET /api/chunks/{id}
 
-### Embedding foundation APIs
+### Embedding APIs
 
-- POST /api/chunks/{id}/embeddings
-- GET /api/chunks/{id}/embeddings
+- POST /api/chunks/{chunkId}/embeddings
+- GET /api/chunks/{chunkId}/embeddings
+- GET /api/embeddings/{id}
 
-These endpoints are designed to support a staged roadmap and intentionally avoid premature AI integration beyond foundational model abstraction.
+### Vector search APIs
+
+- POST /api/search/vector
 
 ## Database Overview
 
-The current database model is centered on document preparation and retrieval readiness.
+The database model is designed around retrieval readiness, document processing, and future AI workflows.
 
 ### Core entities
 
@@ -217,6 +246,7 @@ The current database model is centered on document preparation and retrieval rea
 - DocumentEmbedding
   - Id
   - ChunkId
+  - EmbeddingVector
   - VectorDimensions
   - ModelName
   - CreatedAt
@@ -224,14 +254,64 @@ The current database model is centered on document preparation and retrieval rea
 ### Database characteristics
 
 - PostgreSQL-based persistence
+- pgvector extension enabled
 - EF Core relationship mapping
 - Document-to-metadata relationship
 - Document-to-chunks relationship
 - Chunk-to-embedding relationship
-- Unique indexes to prevent duplicate records where needed
-- Migration-first schema evolution
+- Migration-driven schema evolution
+- Vector-ready storage for retrieval workflows
 
-## Progress Table
+## Observability & Monitoring
+
+This solution includes the telemetry foundation needed for enterprise readiness and future AI diagnostics.
+
+### Azure Application Insights
+
+- Application Insights integration is configured for local development via .NET User Secrets
+- Telemetry initialization is guarded so the application can still start without a configured connection string
+- Event and metric tracking are prepared for API, database, embedding, and search telemetry
+
+### OpenTelemetry
+
+- ASP.NET Core instrumentation enabled
+- HttpClient tracing enabled
+- SQL instrumentation enabled
+- Metrics pipeline configured for service telemetry
+- Structured logging readiness prepared for Azure Monitor and Application Insights export
+
+### Telemetry coverage
+
+- API request telemetry
+- Request duration and failure tracking
+- Database operation tracking
+- Embedding generation tracking
+- Vector search tracking
+- Search scoring and result count visibility
+
+## Security & Configuration
+
+Security and configuration are handled with a safe and staged approach for local development.
+
+### User Secrets
+
+The API project includes a User Secrets ID and loads secure values using the .NET user-secrets configuration provider.
+
+Required local configuration entries:
+
+- `ConnectionStrings:DefaultConnection`
+- `ApplicationInsights:ConnectionString`
+
+The repository does not store these values in source-controlled configuration files.
+
+### Local developer guidance
+
+- PostgreSQL connection string is stored in User Secrets
+- Application Insights connection string is stored in User Secrets
+- The app can run successfully in development without hardcoded secrets
+- Application Insights is optional when no connection string is configured
+
+## Roadmap
 
 | Phase | Name | Status |
 | --- | --- | --- |
@@ -243,179 +323,62 @@ The current database model is centered on document preparation and retrieval rea
 | Phase 5A | Web Content Ingestion | ✅ Completed |
 | Phase 5B | Chunking Foundation | ✅ Completed |
 | Phase 6 | Embeddings Foundation | ✅ Completed |
-| Phase 7 | Vector Search Foundation | ⬜ Planned |
-| Phase 8 | Semantic Search | ⬜ Planned |
+| Phase 7 | Vector Search Foundation | ✅ Completed |
+| Phase 8 | Observability Foundation | ✅ Completed |
 | Phase 9 | Basic RAG | ⬜ Planned |
-| Phase 10 | Observability Foundation | ⬜ Planned |
-| Phase 11 | Authentication & Authorization | ⬜ Planned |
-| Phase 12 | Azure AI Foundry Integration | ⬜ Planned |
-| Phase 13 | Copilot Studio Integration | ⬜ Planned |
-| Phase 14 | GraphRAG | ⬜ Planned |
-| Phase 15 | Blazor / Vue / React Administration Portal | ⬜ Planned |
-
-## Future Roadmap
-
-The roadmap is intentionally scoped to ensure that architectural foundations are built before advanced AI features are introduced.
-
-### Phase 7 - Vector Search Foundation
-
-Planned work includes:
-
-- pgvector integration
-- Embedding storage strategy
-- Vector indexing concepts
-- Similarity search preparation
-- Storage abstractions for retrieval workflows
-
-### Phase 8 - Semantic Search
-
-Planned work includes:
-
-- Semantic ranking and relevance selection
-- Search pipeline orchestration
-- Retrieval quality optimization
-- Query-time document matching
-
-### Phase 9 - Basic RAG
-
-Planned work includes:
-
-- Retrieval of relevant chunks and documents
-- Prompt construction based on retrieved knowledge
-- Response generation using AI model integration
-- Grounded answer workflow
-
-### Phase 10 - Observability Foundation
-
-Planned work includes:
-
-- Azure Application Insights integration
-- OpenTelemetry instrumentation
-- Request tracing and dependency monitoring
-- AI telemetry and diagnostics
-- Health and performance visibility for production readiness
-
-### Phase 11 - Authentication & Authorization
-
-Planned work includes:
-
-- Microsoft Entra ID integration
-- Role Based Access Control (RBAC)
-- User role management
-- SuperUser role
-- Standard User role
-- Conversation history persistence
-- Conversation visibility restrictions
-- Audit logging for governance and compliance
-
-### Phase 12 - Azure AI Foundry Integration
-
-Planned work includes:
-
-- Embedding model integration
-- Chat model integration
-- Prompt flow orchestration
-- Agent workflow capabilities
-- Evaluation pipelines
-- Safety and telemetry controls
-
-### Phase 13 - Copilot Studio Integration
-
-Planned work includes:
-
-- Copilot Studio agents
-- REST API integration
-- Agent orchestration patterns
-- Business knowledge agent workflows
-- IT support and HR support scenarios
-
-### Phase 14 - GraphRAG
-
-Planned work includes:
-
-- Knowledge graph construction from document relationships
-- Graph-based retrieval augmentation
-- Entity and relationship awareness
-- Structure-aware search and reasoning capabilities
-
-### Phase 15 - Blazor / Vue / React Administration Portal
-
-Planned work includes:
-
-- Admin dashboard for documents and content workflows
-- Portal to manage knowledge sources
-- Monitoring and retrieval insights
-- Operational overview for system administrators
+| Phase 10 | Authentication & Authorization | ⬜ Planned |
+| Phase 11 | Azure AI Foundry Integration | ⬜ Planned |
+| Phase 12 | Copilot Studio Integration | ⬜ Planned |
+| Phase 13 | GraphRAG | ⬜ Planned |
+| Phase 14 | Blazor / Vue / React Administration Portal | ⬜ Planned |
 
 ## Azure AI Foundry Vision
 
-Azure AI Foundry is a strategic future integration point for this platform. The foundation is intentionally designed to support this evolution without prematurely coupling the architecture to a single AI provider.
+Azure AI Foundry is the next strategic integration point for this platform. The current architecture is intentionally designed to support future embedding models, prompt workflows, and agent-based orchestration without prematurely coupling the solution to a single AI provider.
 
-### Planned Foundry capabilities
+### Planned capabilities
 
-- Embedding model support
+- Embedding model integration
 - Chat model deployment integration
 - Prompt flow orchestration
-- Agent patterns for task execution
-- Evaluation pipelines for quality and safety
+- Evaluation pipelines
+- Safety and governance controls
 - AI telemetry and observability
-- Governance-centered AI operations
-
-The current implementation avoids direct Azure AI Foundry calls. This keeps the project aligned to its staged roadmap while preparing the system for future integration with enterprise AI services.
 
 ## Copilot Studio Vision
 
-Copilot Studio will become a future user experience layer that connects business domain knowledge to conversational experiences.
+Copilot Studio will act as a future user experience layer that connects domain knowledge to conversational automation.
 
-### Planned Copilot Studio scenarios
+### Planned scenarios
 
 - Business knowledge agents
 - IT support agents
 - HR support agents
-- Knowledge-driven operational workflow assistants
-- REST-based orchestration with the platform backend
-
-This is a future-facing integration layer and is not part of the current implementation scope.
+- External knowledge-driven assistants
+- REST integration with the platform backend
 
 ## Authentication Vision
 
-Authentication and authorization are planned as a future enterprise capability, not part of the current foundation delivery.
+Authentication and authorization are planned for a later enterprise phase.
 
 ### Planned identity model
 
 - Microsoft Entra ID integration
-- Role Based Access Control (RBAC)
-- SuperUser role for administrative access
-- Standard User role for regular application access
+- Role-Based Access Control (RBAC)
+- SuperUser administration
+- Standard User access model
 - Conversation history persistence
 - Conversation visibility restrictions
-- Audit logging for sensitive actions and governance review
-
-This vision ensures the eventual platform supports enterprise security and compliance requirements as the project grows beyond the technical prototype stage.
-
-## Application Insights and OpenTelemetry Vision
-
-The next operational milestone will focus on robust observability to support enterprise deployment readiness.
-
-### Planned observability scope
-
-- Azure Application Insights integration
-- OpenTelemetry instrumentation
-- Request tracing and dependency tracking
-- AI workflow telemetry
-- Logging for ingestion, processing, retrieval, and errors
-- Operational dashboards and high-level service insights
-
-This phase is essential for production readiness, lifecycle monitoring, and troubleshooting in distributed enterprise AI systems.
+- Audit logging and governance review
 
 ## Getting Started
 
 ### Prerequisites
 
-- .NET SDK
-- PostgreSQL instance
+- .NET 10 SDK
+- PostgreSQL with pgvector enabled
+- Docker (optional, for local database provisioning)
 - Git
-- Optional: Docker for local service management
 
 ### Restore dependencies
 
@@ -423,16 +386,16 @@ This phase is essential for production readiness, lifecycle monitoring, and trou
 dotnet restore
 ```
 
-### Build the solution
+### Build the project
 
 ```bash
-dotnet build
+dotnet build RagPlatform.Api/RagPlatform.Api.csproj
 ```
 
 ### Apply database migrations
 
 ```bash
-dotnet ef database update --project RagPlatform.Api --startup-project RagPlatform.Api
+dotnet ef database update --project RagPlatform.Api/RagPlatform.Api.csproj --startup-project RagPlatform.Api/RagPlatform.Api.csproj
 ```
 
 ### Run the application
@@ -449,32 +412,21 @@ https://localhost:5078/swagger
 
 ## Current Statistics
 
-### Implementation snapshot
-
-- Completed phases: 8 / 15
-- Planned phases: 7
-- API foundation: implemented
-- PostgreSQL integration: implemented
+- Completed phases: 10 / 14
+- Active implementation maturity: foundation + retrieval + observability complete
 - Document lifecycle: implemented
-- Upload foundation: implemented
-- Processing foundation: implemented
-- Web ingestion: implemented
-- Chunking foundation: implemented
-- Embedding foundation: implemented
-- Provider-driven AI integration: not yet implemented
-- Semantic search: planned
-- RAG: planned
-- Enterprise auth: planned
-- Observability: planned
-
-### Current project position
-
-The solution is in a strong foundation stage and is well-prepared for the next major milestone: vector search foundation and retrieval architecture.
+- Retrieval preparation: implemented
+- Vector storage: implemented
+- Search foundation: implemented
+- Observability foundation: implemented
+- Advanced AI orchestration: not yet implemented
+- Basic RAG: planned
+- Authentication and user governance: planned
 
 ## License
 
-This project is intended for portfolio demonstration, technical evaluation, and architectural learning. It is not a production-ready enterprise application yet, but it represents a disciplined and realistic approach to building an AI-enabled knowledge platform.
+This project is intended for portfolio demonstration, technical evaluation, and architectural learning. It represents a disciplined, staged approach to building an AI-ready knowledge platform with a secure and observable backend foundation.
 
 ---
 
-RAG Platform 2.0 is designed to evolve from a disciplined backend foundation into a modern knowledge retrieval and AI platform for enterprise-ready scenarios.
+RAG Platform 2.0 is designed to evolve from a disciplined backend foundation into a modern, retrieval-aware, enterprise-ready AI platform.

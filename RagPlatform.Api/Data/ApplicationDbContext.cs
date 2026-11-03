@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Pgvector.EntityFrameworkCore;
 using RagPlatform.Api.Models;
 
 namespace RagPlatform.Api.Data;
@@ -21,6 +22,7 @@ public sealed class ApplicationDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.HasPostgresExtension("vector");
 
         modelBuilder.Entity<Document>(entity =>
         {
@@ -99,6 +101,9 @@ public sealed class ApplicationDbContext : DbContext
         {
             entity.HasKey(embedding => embedding.Id);
             entity.Property(embedding => embedding.ChunkId)
+                .IsRequired();
+            entity.Property(embedding => embedding.EmbeddingVector)
+                .HasColumnType("vector")
                 .IsRequired();
             entity.Property(embedding => embedding.VectorDimensions)
                 .IsRequired();

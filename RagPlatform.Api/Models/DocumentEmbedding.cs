@@ -1,4 +1,6 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
+using Pgvector;
 
 namespace RagPlatform.Api.Models;
 
@@ -10,6 +12,9 @@ public sealed class DocumentEmbedding
 
     [JsonIgnore]
     public DocumentChunk Chunk { get; set; } = default!;
+
+    [Column(TypeName = "vector")]
+    public Vector EmbeddingVector { get; set; } = new Vector(Array.Empty<float>());
 
     public int VectorDimensions { get; set; }
 

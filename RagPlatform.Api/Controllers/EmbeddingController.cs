@@ -79,4 +79,21 @@ public sealed class EmbeddingController : ControllerBase
 
         return Ok(embeddings);
     }
+
+    [HttpGet("embeddings/{id:guid}")]
+    [ProducesResponseType(typeof(DocumentEmbedding), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<DocumentEmbedding>> GetByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var embedding = await _embeddingService.GetByIdAsync(id, cancellationToken);
+        if (embedding is null)
+        {
+            _logger.LogWarning("Embedding {EmbeddingId} was not found.", id);
+            return NotFound();
+        }
+
+        return Ok(embedding);
+    }
 }
