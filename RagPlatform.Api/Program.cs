@@ -1,7 +1,10 @@
 ﻿using System.Reflection;
 using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.Extensibility;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -10,6 +13,7 @@ using RagPlatform.Api.Contracts.Chunking;
 using RagPlatform.Api.Contracts.Documents;
 using RagPlatform.Api.Contracts.Embeddings;
 using RagPlatform.Api.Contracts.Health;
+using RagPlatform.Api.Contracts.Identity;
 using RagPlatform.Api.Contracts.Processing;
 using RagPlatform.Api.Contracts.Rag;
 using RagPlatform.Api.Contracts.Search;
@@ -20,6 +24,11 @@ using RagPlatform.Api.Providers;
 using RagPlatform.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var azureAdAuthority = builder.Configuration["AzureAd:Authority"]
+    ?? $"https://login.microsoftonline.com/{builder.Configuration["AzureAd:TenantId"]}";
+var azureAdAudience = builder.Configuration["AzureAd:Audience"]
+    ?? $"api://{builder.Configuration["AzureAd:ClientId"]}";
 
 var appInsightsConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"]
     ?? Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING");
@@ -38,6 +47,28 @@ else
 }
 
 builder.Services.AddControllers();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = azureAdAuthority;
+        options.Audience = azureAdAudience;
+        options.RequireHttpsMetadata = true;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = azureAdAuthority,
+            ValidateAudience = true,
+            ValidAudience = azureAdAudience,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            NameClaimType = ClaimTypes.NameIdentifier,
+            RoleClaimType = ClaimTypes.Role,
+            ClockSkew = TimeSpan.FromMinutes(2)
+        };
+    });
+
+builder.Services.AddAuthorization();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddHttpClient("WebContentClient", client =>
 {
@@ -115,6 +146,8 @@ builder.Services.AddScoped<IContextBuilder, ContextBuilder>();
 builder.Services.AddScoped<IPromptBuilder, PromptBuilder>();
 builder.Services.AddScoped<IRagService, RagService>();
 builder.Services.AddScoped<ITelemetryService, ApplicationInsightsTelemetryService>();
+builder.Services.AddScoped<IUserBootstrapService, UserBootstrapService>();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<DocumentProcessingService>();
 
 var app = builder.Build();
@@ -129,6 +162,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 

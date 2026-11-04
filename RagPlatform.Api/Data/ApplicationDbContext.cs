@@ -19,6 +19,8 @@ public sealed class ApplicationDbContext : DbContext
 
     public DbSet<DocumentEmbedding> DocumentEmbeddings => Set<DocumentEmbedding>();
 
+    public DbSet<User> Users => Set<User>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -114,6 +116,38 @@ public sealed class ApplicationDbContext : DbContext
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(embedding => new { embedding.ChunkId, embedding.ModelName })
                 .IsUnique();
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasKey(user => user.Id);
+            entity.Property(user => user.EntraObjectId)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(user => user.Email)
+                .HasMaxLength(255);
+            entity.Property(user => user.UserName)
+                .HasMaxLength(255);
+            entity.Property(user => user.FirstName)
+                .HasMaxLength(100);
+            entity.Property(user => user.LastName)
+                .HasMaxLength(100);
+            entity.Property(user => user.IdentityProvider)
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasDefaultValue("MicrosoftEntraId");
+            entity.Property(user => user.TenantId)
+                .HasMaxLength(255);
+            entity.Property(user => user.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(user => user.UpdatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(user => user.LastLoginAt);
+            entity.HasIndex(user => user.EntraObjectId)
+                .IsUnique();
+            entity.HasIndex(user => user.Email)
+                .IsUnique();
+            entity.HasIndex(user => user.TenantId);
         });
     }
 }

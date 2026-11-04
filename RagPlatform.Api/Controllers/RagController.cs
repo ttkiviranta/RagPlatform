@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RagPlatform.Api.Contracts.Rag;
 
 namespace RagPlatform.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api")]
 public sealed class RagController : ControllerBase

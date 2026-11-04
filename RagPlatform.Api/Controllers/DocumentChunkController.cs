@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RagPlatform.Api.Contracts.Chunking;
 using RagPlatform.Api.Models;
 
 namespace RagPlatform.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api")]
 public sealed class DocumentChunkController : ControllerBase
