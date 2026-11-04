@@ -33,6 +33,7 @@ The platform has completed the following phases:
 - ✅ Phase 6 - Embeddings Foundation
 - ✅ Phase 7 - Vector Search Foundation
 - ✅ Phase 8 - Observability Foundation
+- ✅ Phase 9 - Basic RAG Foundation
 
 ### Current implementation status
 
@@ -51,6 +52,8 @@ The solution currently includes the following capabilities:
 - Embedding storage and metadata persistence
 - pgvector-based vector storage
 - Top-K similarity search foundation
+- Basic retrieval-augmented generation pipeline
+- Context assembly and prompt generation for grounded Q&A
 - Azure Application Insights integration
 - OpenTelemetry instrumentation
 - Secure local configuration using .NET User Secrets
@@ -61,12 +64,25 @@ The current architecture follows a modular, layered approach designed to stay ma
 
 ### Core architecture layers
 
-- API Layer: ASP.NET Core controllers for documents, processing, ingestion, chunking, embeddings, and search
-- Application Layer: service-oriented business logic for document workflows, processing, and retrieval preparation
+- API Layer: ASP.NET Core controllers for documents, processing, ingestion, chunking, embeddings, search, and RAG orchestration
+- Application Layer: service-oriented business logic for document workflows, retrieval, context assembly, and prompt construction
 - Data Layer: PostgreSQL with Entity Framework Core and pgvector
-- Domain Layer: document, metadata, chunk, and embedding models
+- Domain Layer: document, metadata, chunk, embedding, and retrieval models
 - Observability Layer: Azure Application Insights and OpenTelemetry instrumentation
 - Configuration Layer: environment-driven configuration and User Secrets
+
+### Basic RAG architecture
+
+The Phase 9 RAG foundation introduces a retrieval-first pipeline:
+
+- user question request
+- vector search over stored chunk embeddings
+- top-K similarity retrieval
+- context assembly from relevant chunks
+- prompt generation using retrieved context
+- response payload containing the query, retrieved chunk metadata, generated context, and generated prompt
+
+This pattern keeps the application architecture clean and ready for future model integration without coupling the platform to Azure AI Foundry, Semantic Kernel, or Copilot Studio yet.
 
 ### Architecture principles
 
@@ -182,6 +198,15 @@ The current platform has successfully integrated the following areas:
 - request and dependency telemetry
 - database, embedding, and search observability hooks
 
+### Phase 9 - Basic RAG Foundation
+
+- end-to-end retrieval pipeline foundation
+- vector search retrieval over stored chunk embeddings
+- context assembly for grounded question answering
+- prompt generation using question + retrieved context
+- RAG request telemetry for duration, chunk count, context size, and prompt size
+- vendor-neutral foundation for later AI model integration
+
 ## API Capabilities
 
 The current API exposes a practical document processing and retrieval foundation. The following endpoints are available:
@@ -219,6 +244,10 @@ The current API exposes a practical document processing and retrieval foundation
 ### Vector search APIs
 
 - POST /api/search/vector
+
+### Retrieval and prompt APIs
+
+- POST /api/rag/query
 
 These APIs are intentionally scoped to the implemented foundation and keep the solution aligned to the roadmap instead of prematurely introducing full AI orchestration or app-layer features.
 
@@ -334,6 +363,7 @@ Authentication and authorization are not yet implemented, but the system is arch
 - ✅ Phase 6 - Embeddings Foundation
 - ✅ Phase 7 - Vector Search Foundation
 - ✅ Phase 8 - Observability Foundation
+- ✅ Phase 9 - Basic RAG Foundation
 
 ### Planned
 
