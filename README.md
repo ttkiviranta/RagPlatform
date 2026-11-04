@@ -58,6 +58,12 @@ The solution currently includes the following capabilities:
 - OpenTelemetry instrumentation
 - Secure local configuration using .NET User Secrets
 
+## Current Platform Status
+
+The project has evolved from a document and retrieval foundation into an AI-native RAG platform foundation. The current implementation is no longer limited to CRUD and ingestion workflows; it includes a validated retrieval pipeline that turns user questions into relevant chunk retrieval, contextual grounding, and prompt assembly for downstream answer generation.
+
+This means the platform now demonstrates the core architecture required for enterprise AI knowledge retrieval: structured data ingestion, embedding storage, vector search, context assembly, and prompt orchestration at the application layer.
+
 ## Architecture Overview
 
 The current architecture follows a modular, layered approach designed to stay maintainable as the platform grows from a retrieval foundation into a broader AI platform.
@@ -75,14 +81,34 @@ The current architecture follows a modular, layered approach designed to stay ma
 
 The Phase 9 RAG foundation introduces a retrieval-first pipeline:
 
-- user question request
-- vector search over stored chunk embeddings
-- top-K similarity retrieval
-- context assembly from relevant chunks
-- prompt generation using retrieved context
-- response payload containing the query, retrieved chunk metadata, generated context, and generated prompt
+- User Question
+- Vector Search
+- Chunk Retrieval
+- Context Builder
+- Prompt Builder
+- Response
 
 This pattern keeps the application architecture clean and ready for future model integration without coupling the platform to Azure AI Foundry, Semantic Kernel, or Copilot Studio yet.
+
+## Basic RAG Architecture
+
+The current RAG flow is intentionally simple, deterministic, and model-agnostic:
+
+```text
+User Question
+    ↓
+Vector Search
+    ↓
+Chunk Retrieval
+    ↓
+Context Builder
+    ↓
+Prompt Builder
+    ↓
+Response
+```
+
+This phase validates the retrieval pipeline as a stable foundation before introducing AI model calls, agent orchestration, or external vendor-specific integrations.
 
 ### Architecture principles
 
@@ -367,19 +393,41 @@ Authentication and authorization are not yet implemented, but the system is arch
 
 ### Planned
 
-- ⬜ Phase 9 - Basic RAG
-- ⬜ Phase 10 - Authentication & Authorization
-  - Microsoft Entra ID
-  - Role-Based Access Control (RBAC)
-  - User Management
-  - SuperUser Management
-  - Conversation History
-  - Audit Logging
+- ⬜ Phase 10A - Microsoft Entra ID Foundation
+  - App Registration
+  - JWT Bearer Authentication
+  - User Bootstrap
+  - Current User Context
+  - Authenticated API Access
+- ⬜ Phase 10B - Authorization & RBAC
+  - User Role
+  - PowerUser Role
+  - SuperUser Role
+  - Resource Ownership
+  - Authorization Policies
+- ⬜ Phase 10C - Conversation History
+  - Conversations
+  - Messages
+  - User Context Retention
+  - Retrieval Context Support
+  - Future Chat History
+- ⬜ Phase 10D - Audit & Governance
+  - Audit Logs
+  - Security Events
+  - Access Tracking
+  - Governance Foundation
 - ⬜ Phase 11 - Azure AI Foundry Integration
 - ⬜ Phase 12 - Copilot Studio Integration
 - ⬜ Phase 13 - GraphRAG
-- ⬜ Phase 14 - Blazor / Vue / React Administration Portal
+- ⬜ Phase 14 - Administration Portal
+  - Blazor / React / Vue
 - ⬜ Phase 15 - AI SDLC, MLOps & LLMOps
+  - Prompt Registry
+  - Model Registry
+  - Evaluation Pipelines
+  - Cost Tracking
+  - AI Governance
+  - AI Observability
 
 ## AI SDLC Vision
 
