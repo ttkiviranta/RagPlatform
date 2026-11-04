@@ -11,6 +11,7 @@ using RagPlatform.Api.Contracts.Documents;
 using RagPlatform.Api.Contracts.Embeddings;
 using RagPlatform.Api.Contracts.Health;
 using RagPlatform.Api.Contracts.Processing;
+using RagPlatform.Api.Contracts.Rag;
 using RagPlatform.Api.Contracts.Search;
 using RagPlatform.Api.Contracts.Telemetry;
 using RagPlatform.Api.Contracts.Web;
@@ -110,6 +111,9 @@ builder.Services.AddScoped<IDocumentChunkingService, DocumentChunkingService>();
 builder.Services.AddScoped<IEmbeddingProvider, PlaceholderEmbeddingProvider>();
 builder.Services.AddScoped<IEmbeddingService, EmbeddingService>();
 builder.Services.AddScoped<IVectorSearchService, VectorSearchService>();
+builder.Services.AddScoped<IContextBuilder, ContextBuilder>();
+builder.Services.AddScoped<IPromptBuilder, PromptBuilder>();
+builder.Services.AddScoped<IRagService, RagService>();
 builder.Services.AddScoped<ITelemetryService, ApplicationInsightsTelemetryService>();
 builder.Services.AddScoped<DocumentProcessingService>();
 

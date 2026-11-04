@@ -87,4 +87,20 @@ public sealed class ApplicationInsightsTelemetryService : ITelemetryService
         _telemetryClient.TrackMetric("ResultCount", resultCount, properties);
         _telemetryClient.TrackMetric("AverageSimilarity", averageSimilarity, properties);
     }
+
+    public void TrackRagQuery(string query, int topK, int retrievedChunkCount, int contextLength, int promptLength, double durationMs, bool success)
+    {
+        var properties = new Dictionary<string, string>
+        {
+            ["QueryLength"] = query.Length.ToString(),
+            ["Success"] = success.ToString()
+        };
+
+        _telemetryClient.TrackEvent("RagQuery", properties);
+        _telemetryClient.TrackMetric("RagQueryDurationMs", durationMs, properties);
+        _telemetryClient.TrackMetric("TopK", topK, properties);
+        _telemetryClient.TrackMetric("RetrievedChunkCount", retrievedChunkCount, properties);
+        _telemetryClient.TrackMetric("ContextLength", contextLength, properties);
+        _telemetryClient.TrackMetric("PromptLength", promptLength, properties);
+    }
 }
