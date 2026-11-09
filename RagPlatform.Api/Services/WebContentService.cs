@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using HtmlAgilityPack;
+using RagPlatform.Api.Contracts.Authorization;
 using RagPlatform.Api.Contracts.Web;
 using RagPlatform.Api.Data;
 using RagPlatform.Api.Models;
@@ -10,15 +11,18 @@ namespace RagPlatform.Api.Services;
 public sealed class WebContentService : IWebContentService
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly IDocumentAccessService _documentAccessService;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<WebContentService> _logger;
 
     public WebContentService(
         ApplicationDbContext dbContext,
+        IDocumentAccessService documentAccessService,
         IHttpClientFactory httpClientFactory,
         ILogger<WebContentService> logger)
     {
         _dbContext = dbContext;
+        _documentAccessService = documentAccessService;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
@@ -37,6 +41,7 @@ public sealed class WebContentService : IWebContentService
             throw new ArgumentException("A valid HTTP or HTTPS URL is required.", nameof(url));
         }
 
+        var user = await _documentAccessService.GetRequiredCurrentUserAsync(cancellationToken);
         var client = _httpClientFactory.CreateClient("WebContentClient");
 
         using var response = await client.GetAsync(uri, cancellationToken);
@@ -47,6 +52,8 @@ public sealed class WebContentService : IWebContentService
 
         var html = await response.Content.ReadAsStringAsync(cancellationToken);
         var document = BuildDocument(uri, html);
+        document.OwnerUserId = user.Id;
+        document.TenantId = user.TenantId;
 
         _dbContext.Documents.Add(document);
         await _dbContext.SaveChangesAsync(cancellationToken);

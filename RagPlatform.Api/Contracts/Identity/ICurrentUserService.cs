@@ -1,10 +1,12 @@
+using System.Security.Claims;
+
 namespace RagPlatform.Api.Contracts.Identity;
 
 public interface ICurrentUserService
 {
     bool IsAuthenticated { get; }
 
-    Guid? UserId { get; }
+    ClaimsPrincipal? Principal { get; }
 
     string? EntraObjectId { get; }
 

@@ -1,6 +1,8 @@
 using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using RagPlatform.Api.Authorization;
+using RagPlatform.Api.Contracts.Authorization;
 using RagPlatform.Api.Contracts.Documents;
 using RagPlatform.Api.Data;
 using RagPlatform.Api.Models;
@@ -16,17 +18,23 @@ public sealed class DocumentService : IDocumentService
     };
 
     private readonly ApplicationDbContext _dbContext;
+    private readonly IDocumentAccessService _documentAccessService;
     private readonly ILogger<DocumentService> _logger;
 
-    public DocumentService(ApplicationDbContext dbContext, ILogger<DocumentService> logger)
+    public DocumentService(
+        ApplicationDbContext dbContext,
+        IDocumentAccessService documentAccessService,
+        ILogger<DocumentService> logger)
     {
         _dbContext = dbContext;
+        _documentAccessService = documentAccessService;
         _logger = logger;
     }
 
     public async Task<IReadOnlyCollection<Document>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Documents
+        var user = await _documentAccessService.GetRequiredCurrentUserAsync(cancellationToken);
+        return await _documentAccessService.ScopeDocuments(_dbContext.Documents, user)
             .AsNoTracking()
             .OrderByDescending(document => document.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -34,9 +42,7 @@ public sealed class DocumentService : IDocumentService
 
     public async Task<Document?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Documents
-            .AsNoTracking()
-            .FirstOrDefaultAsync(document => document.Id == id, cancellationToken);
+        return await _documentAccessService.GetAccessibleDocumentAsync(id, DocumentPermission.Read, cancellationToken);
     }
 
     public async Task<Document> CreateAsync(DocumentCreateRequest request, CancellationToken cancellationToken = default)
@@ -45,11 +51,14 @@ public sealed class DocumentService : IDocumentService
 
         var title = NormalizeRequiredValue(request.Title, nameof(request.Title));
         var content = NormalizeRequiredValue(request.Content, nameof(request.Content));
+        var user = await _documentAccessService.GetRequiredCurrentUserAsync(cancellationToken);
 
         var document = new Document
         {
             Title = title,
             Content = content,
+            OwnerUserId = user.Id,
+            TenantId = user.TenantId,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -68,8 +77,10 @@ public sealed class DocumentService : IDocumentService
         var title = NormalizeRequiredValue(request.Title, nameof(request.Title));
         var content = NormalizeRequiredValue(request.Content, nameof(request.Content));
 
-        var existingDocument = await _dbContext.Documents
-            .FirstOrDefaultAsync(document => document.Id == id, cancellationToken);
+        var existingDocument = await _documentAccessService.GetAccessibleDocumentAsync(
+            id,
+            DocumentPermission.Write,
+            cancellationToken);
 
         if (existingDocument is null)
         {
@@ -89,8 +100,10 @@ public sealed class DocumentService : IDocumentService
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var document = await _dbContext.Documents
-            .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+        var document = await _documentAccessService.GetAccessibleDocumentAsync(
+            id,
+            DocumentPermission.Delete,
+            cancellationToken);
 
         if (document is null)
         {
@@ -109,6 +122,7 @@ public sealed class DocumentService : IDocumentService
     public async Task<Document> UploadTextDocumentAsync(IFormFile file, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(file);
+        var user = await _documentAccessService.GetRequiredCurrentUserAsync(cancellationToken);
 
         if (file.Length == 0)
         {
@@ -147,6 +161,8 @@ public sealed class DocumentService : IDocumentService
             FileName = file.FileName,
             ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? GetContentType(extension) : file.ContentType,
             FileSize = file.Length,
+            OwnerUserId = user.Id,
+            TenantId = user.TenantId,
             CreatedAt = DateTime.UtcNow
         };
 

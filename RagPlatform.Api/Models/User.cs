@@ -25,4 +25,8 @@ public sealed class User
     public DateTime? LastLoginAt { get; set; }
 
     public string TenantId { get; set; } = string.Empty;
+
+    public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
+
+    public ICollection<Document> OwnedDocuments { get; set; } = new List<Document>();
 }

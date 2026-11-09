@@ -3,12 +3,15 @@ using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.Extensibility;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Pgvector.EntityFrameworkCore;
+using RagPlatform.Api.Authorization;
+using RagPlatform.Api.Contracts.Authorization;
 using RagPlatform.Api.Contracts.Chunking;
 using RagPlatform.Api.Contracts.Documents;
 using RagPlatform.Api.Contracts.Embeddings;
@@ -67,7 +70,27 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(AuthorizationPolicies.ActiveUser, policy =>
+        policy.RequireAuthenticatedUser()
+            .AddRequirements(new ActiveUserRequirement()));
+    options.AddPolicy(AuthorizationPolicies.DocumentRead, policy =>
+        policy.RequireAuthenticatedUser()
+            .AddRequirements(new ActiveUserRequirement(), new DocumentPermissionRequirement(DocumentPermission.Read)));
+    options.AddPolicy(AuthorizationPolicies.DocumentWrite, policy =>
+        policy.RequireAuthenticatedUser()
+            .AddRequirements(new ActiveUserRequirement(), new DocumentPermissionRequirement(DocumentPermission.Write)));
+    options.AddPolicy(AuthorizationPolicies.DocumentDelete, policy =>
+        policy.RequireAuthenticatedUser()
+            .AddRequirements(new ActiveUserRequirement(), new DocumentPermissionRequirement(DocumentPermission.Delete)));
+    options.AddPolicy(AuthorizationPolicies.UserRoleManage, policy =>
+        policy.RequireAuthenticatedUser()
+            .AddRequirements(new ActiveUserRequirement(), new UserRoleManagementRequirement()));
+});
+builder.Services.AddScoped<IAuthorizationHandler, ActiveUserAuthorizationHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, DocumentAuthorizationHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, UserRoleManagementAuthorizationHandler>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddHttpClient("WebContentClient", client =>
@@ -148,6 +171,7 @@ builder.Services.AddScoped<IRagService, RagService>();
 builder.Services.AddScoped<ITelemetryService, ApplicationInsightsTelemetryService>();
 builder.Services.AddScoped<IUserBootstrapService, UserBootstrapService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddScoped<IDocumentAccessService, DocumentAccessService>();
 builder.Services.AddScoped<DocumentProcessingService>();
 
 var app = builder.Build();
@@ -167,4 +191,3 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
-

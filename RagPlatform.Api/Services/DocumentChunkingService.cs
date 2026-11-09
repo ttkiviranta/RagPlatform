@@ -1,6 +1,8 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using RagPlatform.Api.Authorization;
+using RagPlatform.Api.Contracts.Authorization;
 using RagPlatform.Api.Contracts.Chunking;
 using RagPlatform.Api.Data;
 using RagPlatform.Api.Models;
@@ -10,11 +12,16 @@ namespace RagPlatform.Api.Services;
 public sealed class DocumentChunkingService : IDocumentChunkingService
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly IDocumentAccessService _documentAccessService;
     private readonly ILogger<DocumentChunkingService> _logger;
 
-    public DocumentChunkingService(ApplicationDbContext dbContext, ILogger<DocumentChunkingService> logger)
+    public DocumentChunkingService(
+        ApplicationDbContext dbContext,
+        IDocumentAccessService documentAccessService,
+        ILogger<DocumentChunkingService> logger)
     {
         _dbContext = dbContext;
+        _documentAccessService = documentAccessService;
         _logger = logger;
     }
 
@@ -39,8 +46,10 @@ public sealed class DocumentChunkingService : IDocumentChunkingService
             throw new ArgumentOutOfRangeException(nameof(chunkOverlap), "Chunk overlap must be smaller than chunk size.");
         }
 
-        var document = await _dbContext.Documents
-            .FirstOrDefaultAsync(document => document.Id == documentId, cancellationToken);
+        var document = await _documentAccessService.GetAccessibleDocumentAsync(
+            documentId,
+            DocumentPermission.Write,
+            cancellationToken);
 
         if (document is null)
         {
@@ -102,6 +111,14 @@ public sealed class DocumentChunkingService : IDocumentChunkingService
         Guid documentId,
         CancellationToken cancellationToken = default)
     {
+        if (await _documentAccessService.GetAccessibleDocumentAsync(
+                documentId,
+                DocumentPermission.Read,
+                cancellationToken) is null)
+        {
+            return Array.Empty<DocumentChunk>();
+        }
+
         return await _dbContext.DocumentChunks
             .AsNoTracking()
             .Where(chunk => chunk.DocumentId == documentId)
@@ -111,6 +128,25 @@ public sealed class DocumentChunkingService : IDocumentChunkingService
 
     public async Task<DocumentChunk?> GetByIdAsync(Guid chunkId, CancellationToken cancellationToken = default)
     {
+        var documentId = await _dbContext.DocumentChunks
+            .AsNoTracking()
+            .Where(chunk => chunk.Id == chunkId)
+            .Select(chunk => (Guid?)chunk.DocumentId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (documentId is null)
+        {
+            return null;
+        }
+
+        var document = await _documentAccessService.GetAccessibleDocumentAsync(
+            documentId.Value,
+            DocumentPermission.Read,
+            cancellationToken);
+        if (document is null)
+        {
+            return null;
+        }
+
         return await _dbContext.DocumentChunks
             .AsNoTracking()
             .FirstOrDefaultAsync(chunk => chunk.Id == chunkId, cancellationToken);

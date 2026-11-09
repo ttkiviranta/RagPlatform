@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Pgvector;
+using RagPlatform.Api.Contracts.Authorization;
 using RagPlatform.Api.Contracts.Embeddings;
 using RagPlatform.Api.Contracts.Search;
 using RagPlatform.Api.Contracts.Telemetry;
@@ -11,17 +12,20 @@ namespace RagPlatform.Api.Services;
 public sealed class VectorSearchService : IVectorSearchService
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly IDocumentAccessService _documentAccessService;
     private readonly IEmbeddingProvider _embeddingProvider;
     private readonly ITelemetryService _telemetryService;
     private readonly ILogger<VectorSearchService> _logger;
 
     public VectorSearchService(
         ApplicationDbContext dbContext,
+        IDocumentAccessService documentAccessService,
         IEmbeddingProvider embeddingProvider,
         ITelemetryService telemetryService,
         ILogger<VectorSearchService> logger)
     {
         _dbContext = dbContext;
+        _documentAccessService = documentAccessService;
         _embeddingProvider = embeddingProvider;
         _telemetryService = telemetryService;
         _logger = logger;
@@ -46,6 +50,7 @@ public sealed class VectorSearchService : IVectorSearchService
 
         try
         {
+            var user = await _documentAccessService.GetRequiredCurrentUserAsync(cancellationToken);
             var queryVector = await _embeddingProvider.GenerateEmbeddingAsync(query, "vector-search-query", cancellationToken);
             if (queryVector.Count == 0)
             {
@@ -58,11 +63,17 @@ public sealed class VectorSearchService : IVectorSearchService
             }
 
             var searchVector = queryVector.ToArray();
+            var accessibleDocumentIds = _documentAccessService
+                .ScopeDocuments(_dbContext.Documents.AsNoTracking(), user)
+                .Select(document => document.Id);
+
             var embeddings = await _dbContext.DocumentEmbeddings
                 .AsNoTracking()
                 .Include(embedding => embedding.Chunk)
                 .ThenInclude(chunk => chunk.Document)
-                .Where(embedding => embedding.EmbeddingVector != null)
+                .Where(embedding =>
+                    embedding.EmbeddingVector != null
+                    && accessibleDocumentIds.Contains(embedding.Chunk.DocumentId))
                 .ToListAsync(cancellationToken);
 
             var results = embeddings

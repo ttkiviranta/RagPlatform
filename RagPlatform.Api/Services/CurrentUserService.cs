@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using RagPlatform.Api.Authorization;
 using RagPlatform.Api.Contracts.Identity;
 using RagPlatform.Api.Data;
 
@@ -23,18 +24,10 @@ public sealed class CurrentUserService : ICurrentUserService
 
     public bool IsAuthenticated => _httpContextAccessor.HttpContext?.User?.Identity?.IsAuthenticated == true;
 
-    public Guid? UserId
-    {
-        get
-        {
-            var entraObjectId = EntraObjectId;
-            return Guid.TryParse(entraObjectId, out var userId) ? userId : null;
-        }
-    }
+    public ClaimsPrincipal? Principal => _httpContextAccessor.HttpContext?.User;
 
     public string? EntraObjectId => _httpContextAccessor.HttpContext?.User?.FindFirst("oid")?.Value
-        ?? _httpContextAccessor.HttpContext?.User?.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier")?.Value
-        ?? _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        ?? _httpContextAccessor.HttpContext?.User?.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier")?.Value;
 
     public string? Email => _httpContextAccessor.HttpContext?.User?.FindFirst("preferred_username")?.Value
         ?? _httpContextAccessor.HttpContext?.User?.FindFirst("email")?.Value
@@ -58,19 +51,42 @@ public sealed class CurrentUserService : ICurrentUserService
         }
 
         var entraObjectId = EntraObjectId;
-        if (string.IsNullOrWhiteSpace(entraObjectId))
+        var tenantId = TenantId;
+        if (string.IsNullOrWhiteSpace(entraObjectId) || string.IsNullOrWhiteSpace(tenantId))
         {
             return null;
         }
 
         var user = await _dbContext.Users
-            .FirstOrDefaultAsync(currentUser => currentUser.EntraObjectId == entraObjectId, cancellationToken);
+            .Include(currentUser => currentUser.UserRoles)
+            .ThenInclude(userRole => userRole.Role)
+            .FirstOrDefaultAsync(
+                currentUser => currentUser.EntraObjectId == entraObjectId && currentUser.TenantId == tenantId,
+                cancellationToken);
 
         if (user is not null)
         {
+            if (!user.UserRoles.Any(userRole => userRole.RoleName == RoleNames.User))
+            {
+                await _userBootstrapService.GetOrCreateCurrentUserAsync(principal, cancellationToken);
+                return await _dbContext.Users
+                    .Include(currentUser => currentUser.UserRoles)
+                    .ThenInclude(userRole => userRole.Role)
+                    .FirstOrDefaultAsync(
+                        currentUser => currentUser.EntraObjectId == entraObjectId && currentUser.TenantId == tenantId,
+                        cancellationToken);
+            }
+
             return user;
         }
 
-        return await _userBootstrapService.GetOrCreateCurrentUserAsync(principal, cancellationToken);
+        await _userBootstrapService.GetOrCreateCurrentUserAsync(principal, cancellationToken);
+
+        return await _dbContext.Users
+            .Include(currentUser => currentUser.UserRoles)
+            .ThenInclude(userRole => userRole.Role)
+            .FirstOrDefaultAsync(
+                currentUser => currentUser.EntraObjectId == entraObjectId && currentUser.TenantId == tenantId,
+                cancellationToken);
     }
 }

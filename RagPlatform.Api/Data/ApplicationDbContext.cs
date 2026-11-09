@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Pgvector.EntityFrameworkCore;
+using RagPlatform.Api.Authorization;
 using RagPlatform.Api.Models;
 
 namespace RagPlatform.Api.Data;
@@ -20,6 +21,10 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<DocumentEmbedding> DocumentEmbeddings => Set<DocumentEmbedding>();
 
     public DbSet<User> Users => Set<User>();
+
+    public DbSet<Role> Roles => Set<Role>();
+
+    public DbSet<UserRole> UserRoles => Set<UserRole>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -45,6 +50,15 @@ public sealed class ApplicationDbContext : DbContext
                 .HasDefaultValue(string.Empty);
             entity.Property(document => document.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(document => document.TenantId)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(document => document.OwnerUserId);
+            entity.HasOne(document => document.Owner)
+                .WithMany(user => user.OwnedDocuments)
+                .HasForeignKey(document => document.OwnerUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(document => new { document.TenantId, document.OwnerUserId, document.CreatedAt });
             entity.HasOne(document => document.Metadata)
                 .WithOne(metadata => metadata.Document)
                 .HasForeignKey<DocumentMetadata>(metadata => metadata.DocumentId)
@@ -137,17 +151,49 @@ public sealed class ApplicationDbContext : DbContext
                 .HasMaxLength(100)
                 .HasDefaultValue("MicrosoftEntraId");
             entity.Property(user => user.TenantId)
+                .IsRequired()
                 .HasMaxLength(255);
             entity.Property(user => user.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(user => user.UpdatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(user => user.LastLoginAt);
-            entity.HasIndex(user => user.EntraObjectId)
+            entity.HasIndex(user => new { user.TenantId, user.EntraObjectId })
                 .IsUnique();
             entity.HasIndex(user => user.Email)
-                .IsUnique();
+                .IsUnique(false);
             entity.HasIndex(user => user.TenantId);
+            entity.HasMany(user => user.UserRoles)
+                .WithOne(userRole => userRole.User)
+                .HasForeignKey(userRole => userRole.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Role>(entity =>
+        {
+            entity.HasKey(role => role.Name);
+            entity.Property(role => role.Name)
+                .HasMaxLength(50);
+            entity.Property(role => role.Description)
+                .IsRequired()
+                .HasMaxLength(200);
+            entity.HasData(
+                new Role { Name = RoleNames.User, Description = "Access to owned documents." },
+                new Role { Name = RoleNames.PowerUser, Description = "Tenant-wide document management." },
+                new Role { Name = RoleNames.SuperUser, Description = "Tenant-wide document and role administration." });
+        });
+
+        modelBuilder.Entity<UserRole>(entity =>
+        {
+            entity.HasKey(userRole => new { userRole.UserId, userRole.RoleName });
+            entity.Property(userRole => userRole.RoleName)
+                .HasMaxLength(50);
+            entity.Property(userRole => userRole.AssignedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.HasOne(userRole => userRole.Role)
+                .WithMany(role => role.UserRoles)
+                .HasForeignKey(userRole => userRole.RoleName)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

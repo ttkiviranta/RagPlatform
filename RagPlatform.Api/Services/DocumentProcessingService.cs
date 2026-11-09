@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using RagPlatform.Api.Authorization;
+using RagPlatform.Api.Contracts.Authorization;
 using RagPlatform.Api.Contracts.Processing;
 using RagPlatform.Api.Data;
 using RagPlatform.Api.Models;
@@ -8,17 +10,20 @@ namespace RagPlatform.Api.Services;
 public sealed class DocumentProcessingService
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly IDocumentAccessService _documentAccessService;
     private readonly IPlainTextProcessor _plainTextProcessor;
     private readonly IMarkdownProcessor _markdownProcessor;
     private readonly ILogger<DocumentProcessingService> _logger;
 
     public DocumentProcessingService(
         ApplicationDbContext dbContext,
+        IDocumentAccessService documentAccessService,
         IPlainTextProcessor plainTextProcessor,
         IMarkdownProcessor markdownProcessor,
         ILogger<DocumentProcessingService> logger)
     {
         _dbContext = dbContext;
+        _documentAccessService = documentAccessService;
         _plainTextProcessor = plainTextProcessor;
         _markdownProcessor = markdownProcessor;
         _logger = logger;
@@ -26,6 +31,14 @@ public sealed class DocumentProcessingService
 
     public async Task<DocumentMetadata?> GetMetadataAsync(Guid documentId, CancellationToken cancellationToken = default)
     {
+        if (await _documentAccessService.GetAccessibleDocumentAsync(
+                documentId,
+                DocumentPermission.Read,
+                cancellationToken) is null)
+        {
+            return null;
+        }
+
         return await _dbContext.DocumentMetadata
             .AsNoTracking()
             .FirstOrDefaultAsync(metadata => metadata.DocumentId == documentId, cancellationToken);
@@ -33,8 +46,10 @@ public sealed class DocumentProcessingService
 
     public async Task<DocumentMetadata> ProcessAsync(Guid documentId, CancellationToken cancellationToken = default)
     {
-        var document = await _dbContext.Documents
-            .FirstOrDefaultAsync(item => item.Id == documentId, cancellationToken);
+        var document = await _documentAccessService.GetAccessibleDocumentAsync(
+            documentId,
+            DocumentPermission.Write,
+            cancellationToken);
 
         if (document is null)
         {

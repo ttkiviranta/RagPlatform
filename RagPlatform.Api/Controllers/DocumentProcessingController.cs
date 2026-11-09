@@ -1,11 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RagPlatform.Api.Authorization;
 using RagPlatform.Api.Models;
 using RagPlatform.Api.Services;
 
 namespace RagPlatform.Api.Controllers;
 
-[Authorize]
+[Authorize(Policy = AuthorizationPolicies.ActiveUser)]
 [ApiController]
 [Route("api/documents")]
 public sealed class DocumentProcessingController : ControllerBase

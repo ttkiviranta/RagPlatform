@@ -1,6 +1,8 @@
 ﻿using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Pgvector;
+using RagPlatform.Api.Authorization;
+using RagPlatform.Api.Contracts.Authorization;
 using RagPlatform.Api.Contracts.Embeddings;
 using RagPlatform.Api.Contracts.Telemetry;
 using RagPlatform.Api.Data;
@@ -11,17 +13,20 @@ namespace RagPlatform.Api.Services;
 public sealed class EmbeddingService : IEmbeddingService
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly IDocumentAccessService _documentAccessService;
     private readonly IEmbeddingProvider _embeddingProvider;
     private readonly ITelemetryService _telemetryService;
     private readonly ILogger<EmbeddingService> _logger;
 
     public EmbeddingService(
         ApplicationDbContext dbContext,
+        IDocumentAccessService documentAccessService,
         IEmbeddingProvider embeddingProvider,
         ITelemetryService telemetryService,
         ILogger<EmbeddingService> logger)
     {
         _dbContext = dbContext;
+        _documentAccessService = documentAccessService;
         _embeddingProvider = embeddingProvider;
         _telemetryService = telemetryService;
         _logger = logger;
@@ -36,14 +41,25 @@ public sealed class EmbeddingService : IEmbeddingService
 
         try
         {
-            var chunk = await _dbContext.DocumentChunks
-                .FirstOrDefaultAsync(chunk => chunk.Id == chunkId, cancellationToken);
-
-            if (chunk is null)
+            var documentId = await _dbContext.DocumentChunks
+                .Where(chunk => chunk.Id == chunkId)
+                .Select(chunk => (Guid?)chunk.DocumentId)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (documentId is null)
             {
                 throw new KeyNotFoundException($"Chunk {chunkId} was not found.");
             }
 
+            if (await _documentAccessService.GetAccessibleDocumentAsync(
+                    documentId.Value,
+                    DocumentPermission.Write,
+                    cancellationToken) is null)
+            {
+                throw new KeyNotFoundException($"Chunk {chunkId} was not found.");
+            }
+
+            var chunk = await _dbContext.DocumentChunks
+                .FirstAsync(item => item.Id == chunkId, cancellationToken);
             var resolvedModelName = string.IsNullOrWhiteSpace(modelName)
                 ? "placeholder-embedding-model"
                 : modelName.Trim();
@@ -100,6 +116,19 @@ public sealed class EmbeddingService : IEmbeddingService
         Guid chunkId,
         CancellationToken cancellationToken = default)
     {
+        var documentId = await _dbContext.DocumentChunks
+            .AsNoTracking()
+            .Where(item => item.Id == chunkId)
+            .Select(item => (Guid?)item.DocumentId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (documentId is null || await _documentAccessService.GetAccessibleDocumentAsync(
+                documentId.Value,
+                DocumentPermission.Read,
+                cancellationToken) is null)
+        {
+            return Array.Empty<DocumentEmbedding>();
+        }
+
         return await _dbContext.DocumentEmbeddings
             .AsNoTracking()
             .Where(embedding => embedding.ChunkId == chunkId)
@@ -111,6 +140,29 @@ public sealed class EmbeddingService : IEmbeddingService
         Guid embeddingId,
         CancellationToken cancellationToken = default)
     {
+        var chunkId = await _dbContext.DocumentEmbeddings
+            .AsNoTracking()
+            .Where(embedding => embedding.Id == embeddingId)
+            .Select(embedding => (Guid?)embedding.ChunkId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (chunkId is null)
+        {
+            return null;
+        }
+
+        var documentId = await _dbContext.DocumentChunks
+            .AsNoTracking()
+            .Where(item => item.Id == chunkId.Value)
+            .Select(item => (Guid?)item.DocumentId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (documentId is null || await _documentAccessService.GetAccessibleDocumentAsync(
+                documentId.Value,
+                DocumentPermission.Read,
+                cancellationToken) is null)
+        {
+            return null;
+        }
+
         return await _dbContext.DocumentEmbeddings
             .AsNoTracking()
             .FirstOrDefaultAsync(embedding => embedding.Id == embeddingId, cancellationToken);

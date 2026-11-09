@@ -52,6 +52,9 @@ namespace RagPlatform.Api.Data.Migrations
                     b.Property<long>("FileSize")
                         .HasColumnType("bigint");
 
+                    b.Property<Guid?>("OwnerUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("SourceUrl")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -59,12 +62,21 @@ namespace RagPlatform.Api.Data.Migrations
                         .HasColumnType("character varying(2048)")
                         .HasDefaultValue("");
 
+                    b.Property<string>("TenantId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("OwnerUserId");
+
+                    b.HasIndex("TenantId", "OwnerUserId", "CreatedAt");
 
                     b.ToTable("Documents");
                 });
@@ -176,6 +188,39 @@ namespace RagPlatform.Api.Data.Migrations
                     b.ToTable("DocumentMetadata");
                 });
 
+            modelBuilder.Entity("RagPlatform.Api.Models.Role", b =>
+                {
+                    b.Property<string>("Name")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Name");
+
+                    b.ToTable("Roles");
+
+                    b.HasData(
+                        new
+                        {
+                            Name = "User",
+                            Description = "Access to owned documents."
+                        },
+                        new
+                        {
+                            Name = "PowerUser",
+                            Description = "Tenant-wide document management."
+                        },
+                        new
+                        {
+                            Name = "SuperUser",
+                            Description = "Tenant-wide document and role administration."
+                        });
+                });
+
             modelBuilder.Entity("RagPlatform.Api.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -233,15 +278,45 @@ namespace RagPlatform.Api.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Email")
-                        .IsUnique();
-
-                    b.HasIndex("EntraObjectId")
-                        .IsUnique();
+                    b.HasIndex("Email");
 
                     b.HasIndex("TenantId");
 
+                    b.HasIndex("TenantId", "EntraObjectId")
+                        .IsUnique();
+
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("RagPlatform.Api.Models.UserRole", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RoleName")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("AssignedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("UserId", "RoleName");
+
+                    b.HasIndex("RoleName");
+
+                    b.ToTable("UserRoles");
+                });
+
+            modelBuilder.Entity("RagPlatform.Api.Models.Document", b =>
+                {
+                    b.HasOne("RagPlatform.Api.Models.User", "Owner")
+                        .WithMany("OwnedDocuments")
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Owner");
                 });
 
             modelBuilder.Entity("RagPlatform.Api.Models.DocumentChunk", b =>
@@ -277,6 +352,25 @@ namespace RagPlatform.Api.Data.Migrations
                     b.Navigation("Document");
                 });
 
+            modelBuilder.Entity("RagPlatform.Api.Models.UserRole", b =>
+                {
+                    b.HasOne("RagPlatform.Api.Models.Role", "Role")
+                        .WithMany("UserRoles")
+                        .HasForeignKey("RoleName")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RagPlatform.Api.Models.User", "User")
+                        .WithMany("UserRoles")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Role");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("RagPlatform.Api.Models.Document", b =>
                 {
                     b.Navigation("Chunks");
@@ -287,6 +381,18 @@ namespace RagPlatform.Api.Data.Migrations
             modelBuilder.Entity("RagPlatform.Api.Models.DocumentChunk", b =>
                 {
                     b.Navigation("Embeddings");
+                });
+
+            modelBuilder.Entity("RagPlatform.Api.Models.Role", b =>
+                {
+                    b.Navigation("UserRoles");
+                });
+
+            modelBuilder.Entity("RagPlatform.Api.Models.User", b =>
+                {
+                    b.Navigation("OwnedDocuments");
+
+                    b.Navigation("UserRoles");
                 });
 #pragma warning restore 612, 618
         }

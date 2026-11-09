@@ -20,6 +20,13 @@ public sealed class Document
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    public Guid? OwnerUserId { get; set; }
+
+    [JsonIgnore]
+    public User? Owner { get; set; }
+
+    public string TenantId { get; set; } = string.Empty;
+
     [JsonIgnore]
     public DocumentMetadata? Metadata { get; set; }
 
