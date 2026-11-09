@@ -90,6 +90,7 @@ The solution currently includes the following capabilities:
 - User, PowerUser, and SuperUser role foundation
 - tenant-scoped document ownership and resource authorization
 - owner-scoped chunk, embedding, vector search, and RAG access
+- owner-scoped conversation and message history
 - Azure Application Insights integration
 - OpenTelemetry instrumentation
 - .NET User Secrets for local secure configuration
@@ -100,10 +101,10 @@ The current architecture is designed to remain modular and extensible as the pla
 
 ### Core architecture layers
 
-- API Layer: controllers for documents, ingestion, processing, search, and RAG workflows
+- API Layer: controllers for documents, conversations, ingestion, processing, search, and RAG workflows
 - Identity Layer: Microsoft Entra ID and JWT bearer authentication
 - Application Layer: services for retrieval, context creation, prompt assembly, and user context resolution
-- Data Layer: PostgreSQL with EF Core, pgvector, users, roles, user-role assignments, and tenant-owned documents
+- Data Layer: PostgreSQL with EF Core, pgvector, users, roles, user-role assignments, tenant-owned documents, and user-owned conversations
 - Observability Layer: Azure Application Insights and OpenTelemetry
 - Configuration Layer: appsettings, environment variables, and User Secrets
 
@@ -198,6 +199,100 @@ Test evidence:
 - User B returned an empty result set.
 
 Expected behavior was confirmed.
+
+## Phase 10C - Conversation History
+
+**Status:** 🚧 Implemented, validation pending
+
+Phase 10C adds user-owned conversation history. It reuses the active-user authentication policy and enforces conversation ownership in server-side queries. Conversation history is not yet connected to the RAG request pipeline.
+
+### Conversation Entity
+
+Each conversation belongs to one application user and contains:
+
+- `Id`
+- `Title`
+- `UserId`
+- `CreatedAtUtc`
+- `UpdatedAtUtc`
+
+### ConversationMessage Entity
+
+Each message belongs to a conversation and contains:
+
+- `Id`
+- `ConversationId`
+- `Role` - `User`, `Assistant`, or `System`
+- `Content`
+- `CreatedAtUtc`
+
+Messages are returned in chronological order. Public message creation assigns the `User` role server-side; `Assistant` and `System` roles are reserved for trusted application services.
+
+### Ownership Model and User Isolation
+
+The authenticated request is resolved to the local application user. Services apply `Conversation.UserId == currentUser.Id` when listing, retrieving, or deleting conversations. Message reads and writes first verify ownership of the parent conversation.
+
+```text
+Authenticated Active User
+    ↓
+Local Application User
+    ↓
+Conversation.UserId ownership filter
+    ↓
+Conversation Messages
+```
+
+- Conversations are owner-only, including for `PowerUser` and `SuperUser`; tenant-wide document permissions do not grant access to another user's conversation.
+- The API derives `UserId` from the authenticated application user and does not accept it from the caller.
+- A non-owner receives the same `404` response as for a missing conversation.
+- Deleting a conversation cascades to its messages.
+
+### API Endpoints
+
+- `GET /api/conversations`
+- `GET /api/conversations/{id}`
+- `POST /api/conversations`
+- `DELETE /api/conversations/{id}`
+- `GET /api/conversations/{id}/messages`
+- `POST /api/conversations/{id}/messages`
+
+Endpoints use request and response DTOs; EF Core entities are not returned directly.
+
+### EF Core Migration
+
+Migration generated: `20261109114211_Phase10CConversationHistory`.
+
+It adds the `Conversations` and `ConversationMessages` tables, the required conversation-to-user and message-to-conversation relationships, owner/message query indexes, UTC timestamp defaults, and a constraint for supported message roles. Apply it to the target development database before running the validation workflow:
+
+```bash
+dotnet ef database update
+```
+
+The migration has been generated but has not yet been applied or validated against a database.
+
+### Validation Checklist
+
+- [ ] Apply the Phase 10C migration to the development database.
+- [ ] Acquire separate valid Microsoft Entra ID access tokens for User A and User B.
+- [ ] As User A, create a conversation and save its ID.
+- [ ] As User A, add a message and confirm the response role is `User`.
+- [ ] As User A, retrieve the conversation and its messages successfully.
+- [ ] As User B, list conversations and confirm User A's conversation is absent.
+- [ ] As User B, request User A's conversation and messages; both return `404`.
+- [ ] As User B, try to add a message to or delete User A's conversation; both return `404`.
+- [ ] As User A, delete the conversation and confirm its messages are removed.
+
+The Postman requests are available in [`postman/`](postman/).
+
+### Acceptance Criteria
+
+- All six endpoints require an authenticated active application user.
+- Conversation ownership is derived from the current user and filtered server-side for every operation.
+- User B cannot retrieve, modify, or delete User A's conversation or access its messages.
+- Client-created messages are stored as `User`; callers cannot assign `Assistant` or `System`.
+- API responses contain DTOs only.
+- The migration is applied and the two-user workflow passes with separate Entra users.
+- Phase 10C remains validation pending until the two-user workflow is executed successfully.
 
 ## Technology Stack
 
@@ -319,6 +414,14 @@ Expected behavior was confirmed.
 - `OwnerUserId` filtering across document access and document-derived retrieval
 - Entra-authenticated owner isolation validated with two users
 
+### Phase 10C - Conversation History
+
+- User-owned conversations and conversation messages
+- Server-side ownership filtering for conversation and message endpoints
+- DTO-based API responses
+- Message roles: `User`, `Assistant`, and `System`
+- Two-user validation is pending
+
 ## API Capabilities
 
 The current API exposes the implemented document processing, retrieval, and secure access foundation.
@@ -361,6 +464,15 @@ The current API exposes the implemented document processing, retrieval, and secu
 
 - POST /api/rag/query
 
+### Conversation history APIs
+
+- GET /api/conversations
+- GET /api/conversations/{id}
+- POST /api/conversations
+- DELETE /api/conversations/{id}
+- GET /api/conversations/{id}/messages
+- POST /api/conversations/{id}/messages
+
 ## Database Architecture
 
 The platform uses PostgreSQL as its primary operational database and relies on EF Core migrations for schema evolution.
@@ -374,6 +486,8 @@ The platform uses PostgreSQL as its primary operational database and relies on E
 - Users
 - Roles
 - UserRoles
+- Conversations
+- ConversationMessages
 - __EFMigrationsHistory
 
 ### Primary entities
@@ -398,6 +512,9 @@ Stores the seeded application roles and each user's role assignments. Newly boot
 
 Documents now carry tenant and owner identifiers. Existing documents are assigned to the configured single tenant during migration; their owner remains unset because historical ownership cannot be reliably inferred. Baseline users cannot access those legacy documents until a trusted operator assigns an elevated role or otherwise provisions access.
 
+#### Conversations and ConversationMessages
+Conversations belong to one application user through a required `UserId` foreign key. Messages belong to a conversation and are removed when that conversation is deleted. Services filter conversation access by the current user's local application ID.
+
 ### Database characteristics
 
 - PostgreSQL-first persistence model
@@ -405,6 +522,7 @@ Documents now carry tenant and owner identifiers. Existing documents are assigne
 - pgvector extension enabled for vector storage and retrieval readiness
 - migration-driven schema evolution
 - identity mapping from Entra claims to application user records
+- owner-filtered conversation and message queries
 
 ## Observability & Monitoring
 
@@ -461,11 +579,13 @@ The platform now includes a working identity foundation based on Microsoft Entra
 - the current user context is resolved per request
 - protected endpoints enforce authentication before business processing begins
 
-Authorization is database-backed and resource-based. Users can access their own documents; PowerUsers and SuperUsers can manage documents in their tenant. Tenant boundaries apply independently of role. Conversation history and audit logging remain planned for later phases.
+Authorization is database-backed and resource-based. Users can access their own documents; PowerUsers and SuperUsers can manage documents in their tenant. Tenant boundaries apply independently of role. Conversation history is implemented with validation pending; audit logging remains planned for a later phase.
+
+Conversation access is owner-only and does not inherit tenant-wide document-management permissions. The existing active-user authentication policy is used, while conversation services enforce ownership in their database queries.
 
 ## Postman Test Suite
 
-The Postman assets in [`postman/`](postman/) support the validated Phase 10A authentication and Phase 10B two-user RBAC workflow.
+The Postman assets in [`postman/`](postman/) support the validated Phase 10A authentication, Phase 10B RBAC workflow, and pending Phase 10C conversation ownership checks.
 
 ### Environment
 
@@ -475,6 +595,7 @@ Import `postman/RagPlatform.environment.template.json` and use the environment n
 - `userAToken` - access token for User A; populate locally
 - `userBToken` - access token for User B; populate locally
 - `documentId` - set automatically after User A creates the test document
+- `conversationId` - set automatically after User A creates a test conversation
 
 The committed environment template contains no credentials. Keep tokens in a local Postman environment and never commit or export an environment after adding tokens.
 
@@ -511,6 +632,12 @@ Expected results:
 
 Authentication is provided by Microsoft Entra ID using OAuth 2.0 Authorization Code Flow with PKCE. Authorization is enforced by the application's local `Users`, `Roles`, and `UserRoles` model together with resource ownership. The two-user RBAC validation completed successfully.
 
+### Phase 10C Validation Workflow
+
+The collection includes requests to create a conversation and add a user message as User A, then verify conversation and message access as both users. User B's direct read, message read/write, and delete attempts against User A's conversation are expected to return `404`.
+
+Phase 10C is implemented, but these two-user conversation checks have not yet been validated.
+
 ## Development Roadmap
 
 ### Completed
@@ -529,13 +656,14 @@ Authentication is provided by Microsoft Entra ID using OAuth 2.0 Authorization C
 - ✅ Phase 10A - Microsoft Entra ID Foundation
 - ✅ Phase 10B - Authorization & RBAC
 
-### Planned
+### In validation
 
-- ⬜ Phase 10C - Conversation History
-  - Conversations
-  - Messages
-  - Context Retention
-  - Chat History
+- 🚧 Phase 10C - Conversation History - Implemented, validation pending
+  - User-owned conversations and messages
+  - Server-side ownership filtering
+  - Two-user access validation pending
+
+### Planned
 - ⬜ Phase 10D - Audit & Governance
   - Audit Logs
   - Security Events

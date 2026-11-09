@@ -1,6 +1,6 @@
 # RagPlatform Postman Test Suite
 
-This collection supports the validated Phase 10A authentication and Phase 10B owner-isolation workflow.
+This collection supports the validated Phase 10A authentication and Phase 10B owner-isolation workflow, and provides requests for pending Phase 10C conversation validation.
 
 ## Import
 
@@ -20,6 +20,7 @@ The template defines only these variables:
 | `userAToken` | Empty | User A access token; populate locally |
 | `userBToken` | Empty | User B access token; populate locally |
 | `documentId` | Empty | Set by the create-document request |
+| `conversationId` | Empty | Set by the create-conversation request |
 
 ## Authentication Requests
 
@@ -69,6 +70,18 @@ Expected results:
 - ✅ User B cannot access User A resources
 - ✅ Resource ownership enforced
 - ✅ RBAC validated
+
+## Phase 10C Conversation Validation Workflow
+
+Use the same User A and User B tokens. Run the conversation requests in order:
+
+1. As User A, run **Create Conversation User A**. The response stores its ID in `conversationId`.
+2. As User A, run **Get Conversations User A**, **Get Conversation User A**, **Add User Message User A**, and **Get Messages User A**. Each request should succeed; the new message should have role `User`.
+3. As User B, run **Get Conversations User B** and confirm the conversation ID is absent.
+4. As User B, run **Get Conversation User B**, **Get Messages User B**, **Add User Message User B**, and **Delete Conversation User B**. Each direct access or modification attempt should return `404`.
+5. Optionally, as User A, run **Delete Conversation User A** to delete the conversation and its messages.
+
+The collection prepares the checks but does not constitute validation evidence. Phase 10C remains validation pending until the requests have been run using separate Entra users.
 
 ## Security
 
