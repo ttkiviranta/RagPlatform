@@ -36,6 +36,37 @@ The platform has completed the following phases:
 - ✅ Phase 8 - Observability Foundation
 - ✅ Phase 9 - Basic RAG Foundation
 - ✅ Phase 10A - Microsoft Entra ID Foundation
+- ✅ Phase 10B - Authorization & RBAC
+
+### Phase 10A validation
+
+- ✅ Microsoft Entra ID authentication validated
+- ✅ OAuth 2.0 Authorization Code Flow with PKCE validated
+- ✅ Dedicated App Registration validated
+- ✅ Delegated permission `access_as_user` validated
+- ✅ JWT token validation validated
+- ✅ Protected API access validated
+- ✅ `GET /api/documents` returned HTTP 200 using a valid Microsoft Entra ID access token
+
+### Phase 10B validation
+
+Implemented features:
+
+- User role model with `User`, `PowerUser`, and `SuperUser`
+- Resource ownership and `OwnerUserId` filtering
+- User and tenant isolation
+- Policy-based and resource-based authorization
+
+Validation completed with two separate Microsoft Entra ID users:
+
+- User A authenticated, created `USER_A_PRIVATE_DOCUMENT`, and successfully retrieved the owned document.
+- User B authenticated and accessed protected endpoints but could not view User A's document.
+
+- ✅ User A can access own documents
+- ✅ User B cannot access User A documents
+- ✅ Resource ownership enforced
+- ✅ User isolation validated
+- ✅ RBAC implementation validated successfully
 
 ### Current implementation status
 
@@ -56,6 +87,9 @@ The solution currently includes the following capabilities:
 - JWT bearer authentication
 - user bootstrap and current user context
 - protected API endpoints
+- User, PowerUser, and SuperUser role foundation
+- tenant-scoped document ownership and resource authorization
+- owner-scoped chunk, embedding, vector search, and RAG access
 - Azure Application Insights integration
 - OpenTelemetry instrumentation
 - .NET User Secrets for local secure configuration
@@ -69,7 +103,7 @@ The current architecture is designed to remain modular and extensible as the pla
 - API Layer: controllers for documents, ingestion, processing, search, and RAG workflows
 - Identity Layer: Microsoft Entra ID and JWT bearer authentication
 - Application Layer: services for retrieval, context creation, prompt assembly, and user context resolution
-- Data Layer: PostgreSQL with EF Core, pgvector, and a `Users` table
+- Data Layer: PostgreSQL with EF Core, pgvector, users, roles, user-role assignments, and tenant-owned documents
 - Observability Layer: Azure Application Insights and OpenTelemetry
 - Configuration Layer: appsettings, environment variables, and User Secrets
 
@@ -93,9 +127,9 @@ Response
 
 This pattern validates the RAG foundation before introducing more advanced AI model orchestration, Azure AI Foundry integration, or external agent frameworks.
 
-## Identity Architecture
+## Authentication and Authorization Architecture
 
-The platform now includes a secure identity foundation for authenticated API access:
+Authentication uses Microsoft Entra ID and the OAuth 2.0 Authorization Code Flow with PKCE:
 
 ```text
 Microsoft Entra ID
@@ -109,7 +143,61 @@ Users Table
 Protected API Endpoints
 ```
 
-This establishes the application identity boundary and ensures request validation before future authorization, ownership, and governance features are introduced.
+Authorization is implemented locally using the application RBAC model:
+
+```text
+Users Table
+    ↓
+UserRoles Table
+    ↓
+Roles Table
+    ↓
+Authorization Policies
+    ↓
+OwnerUserId and Tenant-Scoped Resource Access
+```
+
+Authorization is intentionally separated from the identity provider. This keeps the application authorization model independent of the authentication provider and allows future support for Microsoft Entra ID, Google Identity, Auth0, Keycloak, or local authentication without changing that model.
+
+An optional future enhancement may synchronize Entra groups and map them to application roles.
+
+## Validated Architecture
+
+Validation was completed using two separate Microsoft Entra ID users.
+
+User A:
+
+- Authenticated via OAuth 2.0 Authorization Code Flow with PKCE
+- Created document `USER_A_PRIVATE_DOCUMENT`
+- Successfully retrieved the owned document
+
+User B:
+
+- Authenticated via OAuth 2.0 Authorization Code Flow with PKCE
+- Successfully accessed protected endpoints
+- Could not see User A documents
+
+Validation results:
+
+- ✅ Authentication works with Microsoft Entra ID
+- ✅ Access tokens are validated correctly
+- ✅ Automatic user bootstrap works
+- ✅ `OwnerUserId` ownership model works
+- ✅ Resource isolation works
+- ✅ RBAC enforcement works
+- ✅ Multi-user authorization model validated
+
+Test evidence:
+
+`GET /api/documents`
+
+- User A returned the owned document.
+
+`GET /api/documents`
+
+- User B returned an empty result set.
+
+Expected behavior was confirmed.
 
 ## Technology Stack
 
@@ -222,6 +310,15 @@ This establishes the application identity boundary and ensures request validatio
 - local `Users` table for authenticated identity mapping
 - protected API access across core endpoints
 
+### Phase 10B - Authorization & RBAC
+
+- Local application roles: `User`, `PowerUser`, and `SuperUser`
+- `Roles` and `UserRoles` tables with baseline role assignment
+- Policy-based and resource-based authorization
+- Document ownership and tenant isolation
+- `OwnerUserId` filtering across document access and document-derived retrieval
+- Entra-authenticated owner isolation validated with two users
+
 ## API Capabilities
 
 The current API exposes the implemented document processing, retrieval, and secure access foundation.
@@ -275,6 +372,8 @@ The platform uses PostgreSQL as its primary operational database and relies on E
 - DocumentChunks
 - DocumentEmbeddings
 - Users
+- Roles
+- UserRoles
 - __EFMigrationsHistory
 
 ### Primary entities
@@ -293,6 +392,11 @@ Stores embedding vectors, vector dimensions, model metadata, and chunk associati
 
 #### Users
 Stores application-level identity records mapped to Microsoft Entra ID subjects, including the Entra object ID, tenant identifier, email, username, lifecycle metadata, and last login timestamp.
+
+#### Roles and UserRoles
+Stores the seeded application roles and each user's role assignments. Newly bootstrapped users receive the baseline `User` role.
+
+Documents now carry tenant and owner identifiers. Existing documents are assigned to the configured single tenant during migration; their owner remains unset because historical ownership cannot be reliably inferred. Baseline users cannot access those legacy documents until a trusted operator assigns an elevated role or otherwise provisions access.
 
 ### Database characteristics
 
@@ -357,7 +461,7 @@ The platform now includes a working identity foundation based on Microsoft Entra
 - the current user context is resolved per request
 - protected endpoints enforce authentication before business processing begins
 
-This foundation is intentionally limited to identity and access control readiness. RBAC, conversation history, ownership enforcement, and governance features are planned for later phases.
+Authorization is database-backed and resource-based. Users can access their own documents; PowerUsers and SuperUsers can manage documents in their tenant. Tenant boundaries apply independently of role. Conversation history and audit logging remain planned for later phases.
 
 ## Development Roadmap
 
@@ -375,15 +479,10 @@ This foundation is intentionally limited to identity and access control readines
 - ✅ Phase 8 - Observability Foundation
 - ✅ Phase 9 - Basic RAG Foundation
 - ✅ Phase 10A - Microsoft Entra ID Foundation
+- ✅ Phase 10B - Authorization & RBAC
 
 ### Planned
 
-- ⬜ Phase 10B - Authorization & RBAC
-  - User Role
-  - PowerUser Role
-  - SuperUser Role
-  - Resource Ownership
-  - Authorization Policies
 - ⬜ Phase 10C - Conversation History
   - Conversations
   - Messages
