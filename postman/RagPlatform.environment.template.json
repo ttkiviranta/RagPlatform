@@ -1,0 +1,31 @@
+{
+  "id": "8969a247-7c37-49f2-9c2c-4501efcfbcc0",
+  "name": "RagPlatform Local",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5172",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "userAToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "userBToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "documentId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

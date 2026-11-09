@@ -463,6 +463,54 @@ The platform now includes a working identity foundation based on Microsoft Entra
 
 Authorization is database-backed and resource-based. Users can access their own documents; PowerUsers and SuperUsers can manage documents in their tenant. Tenant boundaries apply independently of role. Conversation history and audit logging remain planned for later phases.
 
+## Postman Test Suite
+
+The Postman assets in [`postman/`](postman/) support the validated Phase 10A authentication and Phase 10B two-user RBAC workflow.
+
+### Environment
+
+Import `postman/RagPlatform.environment.template.json` and use the environment named **RagPlatform Local**. It defines:
+
+- `baseUrl` - defaults to `http://localhost:5172`
+- `userAToken` - access token for User A; populate locally
+- `userBToken` - access token for User B; populate locally
+- `documentId` - set automatically after User A creates the test document
+
+The committed environment template contains no credentials. Keep tokens in a local Postman environment and never commit or export an environment after adding tokens.
+
+### Authentication Requests
+
+Acquire separate delegated access tokens for User A and User B using Microsoft Entra ID and OAuth 2.0 Authorization Code Flow with PKCE. The collection's **Get User A Token** and **Get User B Token** requests validate each token against the protected API after the corresponding environment variable has been populated. See [`postman/README.md`](postman/README.md) for the Postman OAuth settings.
+
+### Document Requests
+
+- **Get Documents User A** - lists documents visible to User A.
+- **Get Documents User B** - lists documents visible to User B.
+- **Create Document User A** - creates `USER_A_PRIVATE_DOCUMENT` and stores its identifier in `documentId`.
+
+### Phase 10B Validation Workflow
+
+User A:
+
+1. Acquire User A's token.
+2. Create `USER_A_PRIVATE_DOCUMENT`.
+3. Verify the document appears in **Get Documents User A**.
+
+User B:
+
+1. Acquire User B's token.
+2. Call **Get Documents User B**.
+3. Verify User A's document is not returned.
+
+Expected results:
+
+- ✅ User A can access owned resources
+- ✅ User B cannot access User A resources
+- ✅ Resource ownership enforced
+- ✅ RBAC validated
+
+Authentication is provided by Microsoft Entra ID using OAuth 2.0 Authorization Code Flow with PKCE. Authorization is enforced by the application's local `Users`, `Roles`, and `UserRoles` model together with resource ownership. The two-user RBAC validation completed successfully.
+
 ## Development Roadmap
 
 ### Completed
