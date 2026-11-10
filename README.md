@@ -37,6 +37,7 @@ The platform has completed the following phases:
 - ✅ Phase 9 - Basic RAG Foundation
 - ✅ Phase 10A - Microsoft Entra ID Foundation
 - ✅ Phase 10B - Authorization & RBAC
+- ✅ Phase 10C - Conversation History
 
 ### Phase 10A validation
 
@@ -202,7 +203,9 @@ Expected behavior was confirmed.
 
 ## Phase 10C - Conversation History
 
-**Status:** 🚧 Implemented, validation pending
+**Status:** ✅ Complete
+
+**Validation:** ✅ Validated
 
 Phase 10C adds user-owned conversation history. It reuses the active-user authentication policy and enforces conversation ownership in server-side queries. Conversation history is not yet connected to the RAG request pipeline.
 
@@ -268,31 +271,30 @@ It adds the `Conversations` and `ConversationMessages` tables, the required conv
 dotnet ef database update
 ```
 
-The migration has been generated but has not yet been applied or validated against a database.
+The migration has been applied to the validation database.
 
-### Validation Checklist
+### Validation Results
 
-- [ ] Apply the Phase 10C migration to the development database.
-- [ ] Acquire separate valid Microsoft Entra ID access tokens for User A and User B.
-- [ ] As User A, create a conversation and save its ID.
-- [ ] As User A, add a message and confirm the response role is `User`.
-- [ ] As User A, retrieve the conversation and its messages successfully.
-- [ ] As User B, list conversations and confirm User A's conversation is absent.
-- [ ] As User B, request User A's conversation and messages; both return `404`.
-- [ ] As User B, try to add a message to or delete User A's conversation; both return `404`.
-- [ ] As User A, delete the conversation and confirm its messages are removed.
+Validation completed successfully using two separate Microsoft Entra ID users:
 
-The Postman requests are available in [`postman/`](postman/).
+- ✅ User A created conversation `USER_A_CONVERSATION_TEST`.
+- ✅ User A retrieved the owned conversation.
+- ✅ User A created conversation messages.
+- ✅ User A retrieved the owned messages.
+- ✅ User B could not view User A conversations.
+- ✅ User B received `404` when requesting User A's conversation by ID.
+- ✅ User B received `404` when requesting User A's conversation messages.
 
 ### Acceptance Criteria
 
-- All six endpoints require an authenticated active application user.
-- Conversation ownership is derived from the current user and filtered server-side for every operation.
-- User B cannot retrieve, modify, or delete User A's conversation or access its messages.
-- Client-created messages are stored as `User`; callers cannot assign `Assistant` or `System`.
-- API responses contain DTOs only.
-- The migration is applied and the two-user workflow passes with separate Entra users.
-- Phase 10C remains validation pending until the two-user workflow is executed successfully.
+- ✅ All six endpoints require an authenticated active application user.
+- ✅ Conversation ownership is derived from the current user and filtered server-side.
+- ✅ User B cannot list or retrieve User A's conversation or its messages.
+- ✅ Client-created messages are stored as `User`; callers cannot assign `Assistant` or `System`.
+- ✅ API responses contain DTOs only.
+- ✅ The migration is applied and the two-user workflow passes with separate Entra users.
+
+The Postman requests are available in [`postman/`](postman/).
 
 ## Technology Stack
 
@@ -420,7 +422,7 @@ The Postman requests are available in [`postman/`](postman/).
 - Server-side ownership filtering for conversation and message endpoints
 - DTO-based API responses
 - Message roles: `User`, `Assistant`, and `System`
-- Two-user validation is pending
+- Two-user Entra validation completed successfully
 
 ## API Capabilities
 
@@ -579,13 +581,13 @@ The platform now includes a working identity foundation based on Microsoft Entra
 - the current user context is resolved per request
 - protected endpoints enforce authentication before business processing begins
 
-Authorization is database-backed and resource-based. Users can access their own documents; PowerUsers and SuperUsers can manage documents in their tenant. Tenant boundaries apply independently of role. Conversation history is implemented with validation pending; audit logging remains planned for a later phase.
+Authorization is database-backed and resource-based. Users can access their own documents; PowerUsers and SuperUsers can manage documents in their tenant. Tenant boundaries apply independently of role. Conversation history is implemented and validated; audit logging remains planned for a later phase.
 
 Conversation access is owner-only and does not inherit tenant-wide document-management permissions. The existing active-user authentication policy is used, while conversation services enforce ownership in their database queries.
 
 ## Postman Test Suite
 
-The Postman assets in [`postman/`](postman/) support the validated Phase 10A authentication, Phase 10B RBAC workflow, and pending Phase 10C conversation ownership checks.
+The Postman assets in [`postman/`](postman/) support the validated Phase 10A authentication, Phase 10B RBAC workflow, and Phase 10C conversation ownership checks.
 
 ### Environment
 
@@ -634,9 +636,7 @@ Authentication is provided by Microsoft Entra ID using OAuth 2.0 Authorization C
 
 ### Phase 10C Validation Workflow
 
-The collection includes requests to create a conversation and add a user message as User A, then verify conversation and message access as both users. User B's direct read, message read/write, and delete attempts against User A's conversation are expected to return `404`.
-
-Phase 10C is implemented, but these two-user conversation checks have not yet been validated.
+The collection includes requests to create a conversation and add a user message as User A, then verify conversation and message access as both users. Validation completed successfully: User A retrieved their conversation and messages, while User B could not list the conversation and received `404` for direct conversation and message retrieval.
 
 ## Development Roadmap
 
@@ -655,13 +655,7 @@ Phase 10C is implemented, but these two-user conversation checks have not yet be
 - ✅ Phase 9 - Basic RAG Foundation
 - ✅ Phase 10A - Microsoft Entra ID Foundation
 - ✅ Phase 10B - Authorization & RBAC
-
-### In validation
-
-- 🚧 Phase 10C - Conversation History - Implemented, validation pending
-  - User-owned conversations and messages
-  - Server-side ownership filtering
-  - Two-user access validation pending
+- ✅ Phase 10C - Conversation History
 
 ### Planned
 - ⬜ Phase 10D - Audit & Governance

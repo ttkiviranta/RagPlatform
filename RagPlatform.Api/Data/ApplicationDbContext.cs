@@ -26,6 +26,10 @@ public sealed class ApplicationDbContext : DbContext
 
     public DbSet<UserRole> UserRoles => Set<UserRole>();
 
+    public DbSet<Conversation> Conversations => Set<Conversation>();
+
+    public DbSet<ConversationMessage> ConversationMessages => Set<ConversationMessage>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -194,6 +198,46 @@ public sealed class ApplicationDbContext : DbContext
                 .WithMany(role => role.UserRoles)
                 .HasForeignKey(userRole => userRole.RoleName)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Conversation>(entity =>
+        {
+            entity.HasKey(conversation => conversation.Id);
+            entity.Property(conversation => conversation.Title)
+                .IsRequired()
+                .HasMaxLength(200);
+            entity.Property(conversation => conversation.UserId)
+                .IsRequired();
+            entity.Property(conversation => conversation.CreatedAtUtc)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(conversation => conversation.UpdatedAtUtc)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.HasIndex(conversation => new { conversation.UserId, conversation.UpdatedAtUtc });
+            entity.HasOne(conversation => conversation.User)
+                .WithMany(user => user.Conversations)
+                .HasForeignKey(conversation => conversation.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasMany(conversation => conversation.Messages)
+                .WithOne(message => message.Conversation)
+                .HasForeignKey(message => message.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ConversationMessage>(entity =>
+        {
+            entity.ToTable("ConversationMessages", table => table.HasCheckConstraint(
+                "CK_ConversationMessages_Role",
+                "\"Role\" IN ('User', 'Assistant', 'System')"));
+            entity.HasKey(message => message.Id);
+            entity.Property(message => message.Role)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .IsRequired();
+            entity.Property(message => message.Content)
+                .IsRequired();
+            entity.Property(message => message.CreatedAtUtc)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.HasIndex(message => new { message.ConversationId, message.CreatedAtUtc, message.Id });
         });
     }
 }

@@ -24,6 +24,70 @@ namespace RagPlatform.Api.Data.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "vector");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("RagPlatform.Api.Models.Conversation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "UpdatedAtUtc");
+
+                    b.ToTable("Conversations");
+                });
+
+            modelBuilder.Entity("RagPlatform.Api.Models.ConversationMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversationId", "CreatedAtUtc", "Id");
+
+                    b.ToTable("ConversationMessages", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ConversationMessages_Role", "\"Role\" IN ('User', 'Assistant', 'System')");
+                        });
+                });
+
             modelBuilder.Entity("RagPlatform.Api.Models.Document", b =>
                 {
                     b.Property<Guid>("Id")
@@ -309,6 +373,28 @@ namespace RagPlatform.Api.Data.Migrations
                     b.ToTable("UserRoles");
                 });
 
+            modelBuilder.Entity("RagPlatform.Api.Models.Conversation", b =>
+                {
+                    b.HasOne("RagPlatform.Api.Models.User", "User")
+                        .WithMany("Conversations")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("RagPlatform.Api.Models.ConversationMessage", b =>
+                {
+                    b.HasOne("RagPlatform.Api.Models.Conversation", "Conversation")
+                        .WithMany("Messages")
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Conversation");
+                });
+
             modelBuilder.Entity("RagPlatform.Api.Models.Document", b =>
                 {
                     b.HasOne("RagPlatform.Api.Models.User", "Owner")
@@ -371,6 +457,11 @@ namespace RagPlatform.Api.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("RagPlatform.Api.Models.Conversation", b =>
+                {
+                    b.Navigation("Messages");
+                });
+
             modelBuilder.Entity("RagPlatform.Api.Models.Document", b =>
                 {
                     b.Navigation("Chunks");
@@ -390,6 +481,8 @@ namespace RagPlatform.Api.Data.Migrations
 
             modelBuilder.Entity("RagPlatform.Api.Models.User", b =>
                 {
+                    b.Navigation("Conversations");
+
                     b.Navigation("OwnedDocuments");
 
                     b.Navigation("UserRoles");

@@ -13,6 +13,7 @@ using Pgvector.EntityFrameworkCore;
 using RagPlatform.Api.Authorization;
 using RagPlatform.Api.Contracts.Authorization;
 using RagPlatform.Api.Contracts.Chunking;
+using RagPlatform.Api.Contracts.Conversations;
 using RagPlatform.Api.Contracts.Documents;
 using RagPlatform.Api.Contracts.Embeddings;
 using RagPlatform.Api.Contracts.Health;
@@ -158,6 +159,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.AddScoped<IHealthService, HealthService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<IConversationService, ConversationService>();
+builder.Services.AddScoped<IConversationMessageService, ConversationMessageService>();
 builder.Services.AddScoped<IPlainTextProcessor, PlainTextProcessor>();
 builder.Services.AddScoped<IMarkdownProcessor, MarkdownProcessor>();
 builder.Services.AddScoped<IWebContentService, WebContentService>();

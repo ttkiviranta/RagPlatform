@@ -29,4 +29,6 @@ public sealed class User
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
 
     public ICollection<Document> OwnedDocuments { get; set; } = new List<Document>();
+
+    public ICollection<Conversation> Conversations { get; set; } = new List<Conversation>();
 }
