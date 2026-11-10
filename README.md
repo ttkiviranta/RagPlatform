@@ -38,6 +38,7 @@ The platform has completed the following phases:
 - ✅ Phase 10A - Microsoft Entra ID Foundation
 - ✅ Phase 10B - Authorization & RBAC
 - ✅ Phase 10C - Conversation History
+- ✅ Phase 10D - Audit Foundation
 
 ### Phase 10A validation
 
@@ -92,6 +93,7 @@ The solution currently includes the following capabilities:
 - tenant-scoped document ownership and resource authorization
 - owner-scoped chunk, embedding, vector search, and RAG access
 - owner-scoped conversation and message history
+- durable audit events for authentication, user bootstrap, document and conversation lifecycle, denied resource access, vector search, and RAG execution
 - Azure Application Insights integration
 - OpenTelemetry instrumentation
 - .NET User Secrets for local secure configuration
@@ -296,6 +298,59 @@ Validation completed successfully using two separate Microsoft Entra ID users:
 
 The Postman requests are available in [`postman/`](postman/).
 
+## Phase 10D - Audit Foundation
+
+**Status:** ✅ Complete
+
+**Validation:** ✅ Validated
+
+Phase 10D adds durable, tenant-aware audit events to PostgreSQL. Audit events are written separately from Application Insights and OpenTelemetry telemetry. Business mutation events are added to the same EF Core save as their corresponding data changes.
+
+### Event Coverage
+
+- `AuthenticationTokenValidated` is written when the API validates a bearer token. This records authenticated API activity, not an interactive Microsoft Entra ID sign-in.
+- `UserBootstrapped` is written when a local application user is first created.
+- `ActiveUserAuthorizationDenied` records a validated identity that does not resolve to an active application user.
+- `DocumentCreated` covers document creation, text upload, and web content import.
+- `DocumentUpdated` and `DocumentDeleted` record document changes.
+- `ConversationCreated` and `ConversationDeleted` record conversation changes.
+- `DocumentAccessDenied` and `ConversationAccessDenied` record denied resource access attempts.
+- `VectorSearchExecuted` records success or failure with duration, input character count, requested `topK`, result count, and average similarity.
+- `RagQueryExecuted` records success or failure with duration, input character count, requested `topK`, retrieved result count, context character count, and prompt character count.
+
+### Audit Event Data
+
+Each event includes tenant ID, optional local actor user ID, event type, outcome, target type and ID, UTC timestamp, correlation ID, HTTP method, and request path. AI-operation events use typed numeric operational metadata only. Query text, prompt content, document content, conversation message content, and model responses are not written to audit events, telemetry, or application log messages.
+
+### Database Migration
+
+Generated migrations:
+
+- `20261110105824_Phase10DAuditFoundation` creates `AuditEvents`, tenant/time and event/time indexes, and an optional actor-user relationship that preserves audit rows if a user is deleted.
+- `20261110111605_AddVectorSearchAndRagAuditMetadata` adds typed operational metadata columns for vector search and RAG events.
+
+Apply the migrations to the target database before validating:
+
+```bash
+dotnet ef database update
+```
+
+### Validation Results
+
+Validation completed using two separate Microsoft Entra ID users:
+
+- ✅ `AuthenticationTokenValidated`
+- ✅ `ConversationCreated`
+- ✅ `ConversationDeleted`
+- ✅ `ConversationAccessDenied`
+- ✅ Successful operations generated audit records.
+- ✅ Denied access attempts generated audit records.
+- ✅ Target resources were captured correctly.
+- ✅ Outcomes (`Succeeded` / `Denied`) were captured correctly.
+- ✅ Audit events were persisted to PostgreSQL.
+
+Phase 10D does not include an audit-query API, retention/purge processing, or governance reporting. Those capabilities are planned for **Phase 10E - Governance Foundation**.
+
 ## Technology Stack
 
 ### Core technologies
@@ -490,6 +545,7 @@ The platform uses PostgreSQL as its primary operational database and relies on E
 - UserRoles
 - Conversations
 - ConversationMessages
+- AuditEvents
 - __EFMigrationsHistory
 
 ### Primary entities
@@ -517,6 +573,9 @@ Documents now carry tenant and owner identifiers. Existing documents are assigne
 #### Conversations and ConversationMessages
 Conversations belong to one application user through a required `UserId` foreign key. Messages belong to a conversation and are removed when that conversation is deleted. Services filter conversation access by the current user's local application ID.
 
+#### AuditEvents
+Stores tenant-scoped authentication, bootstrap, resource lifecycle, and denied-access events with actor, target, timestamp, and request-correlation metadata. Audit records do not store document, message, or prompt content.
+
 ### Database characteristics
 
 - PostgreSQL-first persistence model
@@ -525,6 +584,7 @@ Conversations belong to one application user through a required `UserId` foreign
 - migration-driven schema evolution
 - identity mapping from Entra claims to application user records
 - owner-filtered conversation and message queries
+- tenant-scoped audit-event persistence
 
 ## Observability & Monitoring
 
@@ -581,7 +641,7 @@ The platform now includes a working identity foundation based on Microsoft Entra
 - the current user context is resolved per request
 - protected endpoints enforce authentication before business processing begins
 
-Authorization is database-backed and resource-based. Users can access their own documents; PowerUsers and SuperUsers can manage documents in their tenant. Tenant boundaries apply independently of role. Conversation history is implemented and validated; audit logging remains planned for a later phase.
+Authorization is database-backed and resource-based. Users can access their own documents; PowerUsers and SuperUsers can manage documents in their tenant. Tenant boundaries apply independently of role. Conversation history is implemented and validated. The Phase 10D audit foundation is implemented, with migration and end-to-end validation pending.
 
 Conversation access is owner-only and does not inherit tenant-wide document-management permissions. The existing active-user authentication policy is used, while conversation services enforce ownership in their database queries.
 
@@ -656,13 +716,13 @@ The collection includes requests to create a conversation and add a user message
 - ✅ Phase 10A - Microsoft Entra ID Foundation
 - ✅ Phase 10B - Authorization & RBAC
 - ✅ Phase 10C - Conversation History
+- ✅ Phase 10D - Audit Foundation
 
 ### Planned
-- ⬜ Phase 10D - Audit & Governance
-  - Audit Logs
-  - Security Events
-  - Access Tracking
-  - Governance Foundation
+- ⬜ Phase 10E - Governance Foundation
+  - Tenant-scoped audit query API
+  - Configurable retention and purge
+  - Governance reporting foundations
 - ⬜ Phase 11 - Azure AI Foundry Integration
 - ⬜ Phase 12 - Copilot Studio Integration
 - ⬜ Phase 13 - GraphRAG
