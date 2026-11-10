@@ -700,7 +700,7 @@ The collection includes requests to create a conversation and add a user message
 
 ## Development Roadmap
 
-### Completed
+### ✅ Completed Foundations
 
 - ✅ Phase 1 - API Foundation
 - ✅ Phase 2 - PostgreSQL Foundation
@@ -718,15 +718,54 @@ The collection includes requests to create a conversation and add a user message
 - ✅ Phase 10C - Conversation History
 - ✅ Phase 10D - Audit Foundation
 
-### Planned
+### 🚧 Governance Layer
+
+Establish controlled access to audit data, lifecycle management, and compliance-ready reporting.
+
 - ⬜ Phase 10E - Governance Foundation
-  - Tenant-scoped audit query API
-  - Configurable retention and purge
-  - Governance reporting foundations
-- ⬜ Phase 11 - Azure AI Foundry Integration
+  - Tenant-scoped Audit Query API
+  - Retention & Purge Policies
+  - Governance Reporting
+  - Compliance Foundations
+
+### 🤖 AI Layer
+
+Connect the secured retrieval platform to AI services, then make its capabilities available through Copilot Studio.
+
+- ⬜ Phase 11 - Azure AI Foundry RAG Integration
+  - Azure AI Foundry connectivity
+  - Model integration
+  - Grounded RAG responses
+  - AI invocation auditing
+  - Conversation-aware responses
 - ⬜ Phase 12 - Copilot Studio Integration
+  - External Copilot integration
+  - Business workflow orchestration
+  - API consumption through Copilot Studio
+
+### 🧠 Advanced Knowledge Layer
+
+Extend retrieval beyond vector similarity to include explicit knowledge relationships.
+
 - ⬜ Phase 13 - GraphRAG
+  - Knowledge graph enrichment
+  - Relationship-aware retrieval
+  - Hybrid vector + graph retrieval
+
+### 🏢 Enterprise Platform Layer
+
+Add operator-facing capabilities for managing users, roles, governance, and audit investigations.
+
 - ⬜ Phase 14 - Administration Portal
+  - User administration
+  - Role management
+  - Governance dashboards
+  - Audit investigation
+
+### ⚙️ AI Engineering & Operations Layer
+
+Introduce repeatable AI development, evaluation, governance, and operational cost controls.
+
 - ⬜ Phase 15 - AI SDLC, MLOps & LLMOps
   - Prompt Registry
   - Model Registry
