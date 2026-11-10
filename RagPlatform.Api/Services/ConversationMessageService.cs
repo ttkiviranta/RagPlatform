@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RagPlatform.Api.Contracts.Audit;
 using RagPlatform.Api.Contracts.Conversations;
 using RagPlatform.Api.Contracts.Identity;
 using RagPlatform.Api.Data;
@@ -10,13 +11,16 @@ public sealed class ConversationMessageService : IConversationMessageService
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IAuditEventWriter _auditEventWriter;
 
     public ConversationMessageService(
         ApplicationDbContext dbContext,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IAuditEventWriter auditEventWriter)
     {
         _dbContext = dbContext;
         _currentUserService = currentUserService;
+        _auditEventWriter = auditEventWriter;
     }
 
     public async Task<IReadOnlyCollection<ConversationMessageResponse>?> GetMessagesAsync(
@@ -28,9 +32,13 @@ public sealed class ConversationMessageService : IConversationMessageService
             .AnyAsync(
                 conversation => conversation.Id == conversationId && conversation.UserId == currentUser.Id,
                 cancellationToken);
-
         if (!ownsConversation)
         {
+            if (await _dbContext.Conversations.AnyAsync(conversation => conversation.Id == conversationId, cancellationToken))
+            {
+                await RecordDeniedAccessAsync(currentUser, conversationId, cancellationToken);
+            }
+
             return null;
         }
 
@@ -71,6 +79,11 @@ public sealed class ConversationMessageService : IConversationMessageService
 
         if (conversation is null)
         {
+            if (await _dbContext.Conversations.AnyAsync(item => item.Id == conversationId, cancellationToken))
+            {
+                await RecordDeniedAccessAsync(currentUser, conversationId, cancellationToken);
+            }
+
             return null;
         }
 
@@ -94,6 +107,18 @@ public sealed class ConversationMessageService : IConversationMessageService
             Content = message.Content,
             CreatedAtUtc = message.CreatedAtUtc
         };
+    }
+
+    private async Task RecordDeniedAccessAsync(User currentUser, Guid conversationId, CancellationToken cancellationToken)
+    {
+        _auditEventWriter.Add(
+            currentUser.Id,
+            currentUser.TenantId,
+            AuditEventTypes.ConversationAccessDenied,
+            "Denied",
+            "Conversation",
+            conversationId.ToString());
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<User> GetRequiredCurrentUserAsync(CancellationToken cancellationToken)

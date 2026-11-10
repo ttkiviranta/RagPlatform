@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using RagPlatform.Api.Contracts.Audit;
+using RagPlatform.Api.Contracts.Identity;
 using RagPlatform.Api.Contracts.Rag;
 using RagPlatform.Api.Contracts.Search;
 using RagPlatform.Api.Contracts.Telemetry;
@@ -11,6 +13,8 @@ public sealed class RagService : IRagService
     private readonly IContextBuilder _contextBuilder;
     private readonly IPromptBuilder _promptBuilder;
     private readonly ITelemetryService _telemetryService;
+    private readonly ICurrentUserService _currentUserService;
+    private readonly IAuditEventWriter _auditEventWriter;
     private readonly ILogger<RagService> _logger;
 
     public RagService(
@@ -18,12 +22,16 @@ public sealed class RagService : IRagService
         IContextBuilder contextBuilder,
         IPromptBuilder promptBuilder,
         ITelemetryService telemetryService,
+        ICurrentUserService currentUserService,
+        IAuditEventWriter auditEventWriter,
         ILogger<RagService> logger)
     {
         _vectorSearchService = vectorSearchService;
         _contextBuilder = contextBuilder;
         _promptBuilder = promptBuilder;
         _telemetryService = telemetryService;
+        _currentUserService = currentUserService;
+        _auditEventWriter = auditEventWriter;
         _logger = logger;
     }
 
@@ -42,7 +50,17 @@ public sealed class RagService : IRagService
             throw new ArgumentOutOfRangeException(nameof(topK), "TopK must be between 1 and 20.");
         }
 
+        var currentUser = await _currentUserService.GetCurrentUserAsync(cancellationToken);
+        if (currentUser is not { IsActive: true })
+        {
+            throw new UnauthorizedAccessException("An active application user is required.");
+        }
+
         var stopwatch = Stopwatch.StartNew();
+        var retrievedChunkCount = 0;
+        var contextCharacterCount = 0;
+        var promptCharacterCount = 0;
+        RagQueryResponse response;
 
         try
         {
@@ -55,26 +73,27 @@ public sealed class RagService : IRagService
                     SimilarityScore = result.SimilarityScore
                 })
                 .ToList();
+            retrievedChunkCount = retrievedChunks.Count;
 
             var generatedContext = _contextBuilder.BuildContext(searchResponse.Results);
             var generatedPrompt = _promptBuilder.BuildPrompt(query, generatedContext);
+            contextCharacterCount = generatedContext.Length;
+            promptCharacterCount = generatedPrompt.Length;
 
             _telemetryService.TrackRagQuery(
-                query,
+                query.Length,
                 topK,
                 retrievedChunks.Count,
                 generatedContext.Length,
                 generatedPrompt.Length,
                 stopwatch.Elapsed.TotalMilliseconds,
                 true);
-
             _logger.LogInformation(
-                "RAG query completed for question '{Question}' with {ResultCount} relevant chunks in {DurationMs} ms.",
-                query,
-                retrievedChunks.Count,
+                "RAG query completed with {ResultCount} relevant chunks in {DurationMs} ms.",
+                retrievedChunkCount,
                 stopwatch.Elapsed.TotalMilliseconds);
 
-            return new RagQueryResponse
+            response = new RagQueryResponse
             {
                 Query = query,
                 RetrievedChunks = retrievedChunks,
@@ -85,16 +104,42 @@ public sealed class RagService : IRagService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "RAG query failed for question '{Question}'.", query);
+            _logger.LogError(ex, "RAG query failed.");
             _telemetryService.TrackRagQuery(
-                query,
+                query.Length,
                 topK,
-                0,
-                0,
-                0,
+                retrievedChunkCount,
+                contextCharacterCount,
+                promptCharacterCount,
                 stopwatch.Elapsed.TotalMilliseconds,
                 false);
+            _auditEventWriter.Add(
+                currentUser.Id,
+                currentUser.TenantId,
+                AuditEventTypes.RagQueryExecuted,
+                "Failed",
+                durationMilliseconds: stopwatch.Elapsed.TotalMilliseconds,
+                inputCharacterCount: query.Length,
+                requestedTopK: topK,
+                resultCount: retrievedChunkCount,
+                contextCharacterCount: contextCharacterCount,
+                promptCharacterCount: promptCharacterCount);
+            await _auditEventWriter.FlushAsync(cancellationToken);
             throw;
         }
+
+        _auditEventWriter.Add(
+            currentUser.Id,
+            currentUser.TenantId,
+            AuditEventTypes.RagQueryExecuted,
+            "Succeeded",
+            durationMilliseconds: stopwatch.Elapsed.TotalMilliseconds,
+            inputCharacterCount: query.Length,
+            requestedTopK: topK,
+            resultCount: retrievedChunkCount,
+            contextCharacterCount: contextCharacterCount,
+            promptCharacterCount: promptCharacterCount);
+        await _auditEventWriter.FlushAsync(cancellationToken);
+        return response;
     }
 }

@@ -24,6 +24,87 @@ namespace RagPlatform.Api.Data.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "vector");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("RagPlatform.Api.Models.AuditEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<double?>("AverageSimilarity")
+                        .HasColumnType("double precision");
+
+                    b.Property<int?>("ContextCharacterCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<double?>("DurationMilliseconds")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("HttpMethod")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<int?>("InputCharacterCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int?>("PromptCharacterCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RequestPath")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<int?>("RequestedTopK")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ResultCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TargetId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("TargetType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("TenantId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorUserId", "OccurredAtUtc");
+
+                    b.HasIndex("TenantId", "OccurredAtUtc");
+
+                    b.HasIndex("TenantId", "EventType", "OccurredAtUtc");
+
+                    b.ToTable("AuditEvents");
+                });
+
             modelBuilder.Entity("RagPlatform.Api.Models.Conversation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -371,6 +452,14 @@ namespace RagPlatform.Api.Data.Migrations
                     b.HasIndex("RoleName");
 
                     b.ToTable("UserRoles");
+                });
+
+            modelBuilder.Entity("RagPlatform.Api.Models.AuditEvent", b =>
+                {
+                    b.HasOne("RagPlatform.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("RagPlatform.Api.Models.Conversation", b =>

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RagPlatform.Api.Contracts.Audit;
 using RagPlatform.Api.Contracts.Conversations;
 using RagPlatform.Api.Contracts.Identity;
 using RagPlatform.Api.Data;
@@ -10,13 +11,16 @@ public sealed class ConversationService : IConversationService
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IAuditEventWriter _auditEventWriter;
 
     public ConversationService(
         ApplicationDbContext dbContext,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IAuditEventWriter auditEventWriter)
     {
         _dbContext = dbContext;
         _currentUserService = currentUserService;
+        _auditEventWriter = auditEventWriter;
     }
 
     public async Task<IReadOnlyCollection<ConversationResponse>> GetAllAsync(
@@ -44,7 +48,7 @@ public sealed class ConversationService : IConversationService
     {
         var currentUser = await GetRequiredCurrentUserAsync(cancellationToken);
 
-        return await _dbContext.Conversations
+        var conversation = await _dbContext.Conversations
             .AsNoTracking()
             .Where(conversation => conversation.Id == id && conversation.UserId == currentUser.Id)
             .Select(conversation => new ConversationResponse
@@ -55,6 +59,17 @@ public sealed class ConversationService : IConversationService
                 UpdatedAtUtc = conversation.UpdatedAtUtc
             })
             .FirstOrDefaultAsync(cancellationToken);
+        if (conversation is null)
+        {
+            if (await _dbContext.Conversations.AnyAsync(item => item.Id == id, cancellationToken))
+            {
+                await RecordDeniedAccessAsync(currentUser, id, cancellationToken);
+            }
+
+            return null;
+        }
+
+        return conversation;
     }
 
     public async Task<ConversationResponse> CreateAsync(
@@ -78,6 +93,13 @@ public sealed class ConversationService : IConversationService
         };
 
         _dbContext.Conversations.Add(conversation);
+        _auditEventWriter.Add(
+            currentUser.Id,
+            currentUser.TenantId,
+            AuditEventTypes.ConversationCreated,
+            "Succeeded",
+            "Conversation",
+            conversation.Id.ToString());
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return ToResponse(conversation);
@@ -93,12 +115,36 @@ public sealed class ConversationService : IConversationService
 
         if (conversation is null)
         {
+            if (await _dbContext.Conversations.AnyAsync(item => item.Id == id, cancellationToken))
+            {
+                await RecordDeniedAccessAsync(currentUser, id, cancellationToken);
+            }
+
             return false;
         }
 
+        _auditEventWriter.Add(
+            currentUser.Id,
+            currentUser.TenantId,
+            AuditEventTypes.ConversationDeleted,
+            "Succeeded",
+            "Conversation",
+            id.ToString());
         _dbContext.Conversations.Remove(conversation);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    private async Task RecordDeniedAccessAsync(User currentUser, Guid conversationId, CancellationToken cancellationToken)
+    {
+        _auditEventWriter.Add(
+            currentUser.Id,
+            currentUser.TenantId,
+            AuditEventTypes.ConversationAccessDenied,
+            "Denied",
+            "Conversation",
+            conversationId.ToString());
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<User> GetRequiredCurrentUserAsync(CancellationToken cancellationToken)

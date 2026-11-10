@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using RagPlatform.Api.Authorization;
+using RagPlatform.Api.Contracts.Audit;
 using RagPlatform.Api.Contracts.Authorization;
 using RagPlatform.Api.Contracts.Identity;
 using RagPlatform.Api.Data;
@@ -13,15 +14,18 @@ public sealed class DocumentAccessService : IDocumentAccessService
     private readonly ApplicationDbContext _dbContext;
     private readonly IAuthorizationService _authorizationService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IAuditEventWriter _auditEventWriter;
 
     public DocumentAccessService(
         ApplicationDbContext dbContext,
         IAuthorizationService authorizationService,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IAuditEventWriter auditEventWriter)
     {
         _dbContext = dbContext;
         _authorizationService = authorizationService;
         _currentUserService = currentUserService;
+        _auditEventWriter = auditEventWriter;
     }
 
     public async Task<User> GetRequiredCurrentUserAsync(CancellationToken cancellationToken = default)
@@ -46,8 +50,20 @@ public sealed class DocumentAccessService : IDocumentAccessService
             .Select(item => new DocumentAuthorizationResource(item.OwnerUserId, item.TenantId))
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (document is null || _currentUserService.Principal is not { } principal)
+        if (_currentUserService.Principal is not { } principal)
         {
+            return null;
+        }
+
+        var currentUser = await _currentUserService.GetCurrentUserAsync(cancellationToken);
+        if (currentUser is not { IsActive: true })
+        {
+            return null;
+        }
+
+        if (document is null)
+        {
+            await RecordDeniedAccessAsync(currentUser, documentId, cancellationToken);
             return null;
         }
 
@@ -62,11 +78,24 @@ public sealed class DocumentAccessService : IDocumentAccessService
         var authorization = await _authorizationService.AuthorizeAsync(principal, document, policyName);
         if (!authorization.Succeeded)
         {
+            await RecordDeniedAccessAsync(currentUser, documentId, cancellationToken);
             return null;
         }
 
         return await _dbContext.Documents
             .FirstOrDefaultAsync(item => item.Id == documentId, cancellationToken);
+    }
+
+    private async Task RecordDeniedAccessAsync(User currentUser, Guid documentId, CancellationToken cancellationToken)
+    {
+        _auditEventWriter.Add(
+            currentUser.Id,
+            currentUser.TenantId,
+            AuditEventTypes.DocumentAccessDenied,
+            "Denied",
+            "Document",
+            documentId.ToString());
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public IQueryable<Document> ScopeDocuments(IQueryable<Document> documents, User user)

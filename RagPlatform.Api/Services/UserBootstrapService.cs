@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using RagPlatform.Api.Authorization;
+using RagPlatform.Api.Contracts.Audit;
 using RagPlatform.Api.Contracts.Identity;
 using RagPlatform.Api.Data;
 using RagPlatform.Api.Models;
@@ -10,13 +11,16 @@ namespace RagPlatform.Api.Services;
 public sealed class UserBootstrapService : IUserBootstrapService
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly IAuditEventWriter _auditEventWriter;
     private readonly ILogger<UserBootstrapService> _logger;
 
     public UserBootstrapService(
         ApplicationDbContext dbContext,
+        IAuditEventWriter auditEventWriter,
         ILogger<UserBootstrapService> logger)
     {
         _dbContext = dbContext;
+        _auditEventWriter = auditEventWriter;
         _logger = logger;
     }
 
@@ -68,6 +72,13 @@ public sealed class UserBootstrapService : IUserBootstrapService
 
         _dbContext.Users.Add(newUser);
         await EnsureBaseRoleAsync(newUser, cancellationToken);
+        _auditEventWriter.Add(
+            newUser.Id,
+            newUser.TenantId,
+            AuditEventTypes.UserBootstrapped,
+            "Succeeded",
+            "User",
+            newUser.Id.ToString());
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Bootstrapped new user for Entra object id {EntraObjectId}.", entraObjectId);

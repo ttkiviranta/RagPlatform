@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using RagPlatform.Api.Authorization;
+using RagPlatform.Api.Contracts.Audit;
 using RagPlatform.Api.Contracts.Authorization;
 using RagPlatform.Api.Contracts.Documents;
 using RagPlatform.Api.Data;
@@ -19,15 +20,18 @@ public sealed class DocumentService : IDocumentService
 
     private readonly ApplicationDbContext _dbContext;
     private readonly IDocumentAccessService _documentAccessService;
+    private readonly IAuditEventWriter _auditEventWriter;
     private readonly ILogger<DocumentService> _logger;
 
     public DocumentService(
         ApplicationDbContext dbContext,
         IDocumentAccessService documentAccessService,
+        IAuditEventWriter auditEventWriter,
         ILogger<DocumentService> logger)
     {
         _dbContext = dbContext;
         _documentAccessService = documentAccessService;
+        _auditEventWriter = auditEventWriter;
         _logger = logger;
     }
 
@@ -65,6 +69,7 @@ public sealed class DocumentService : IDocumentService
         _logger.LogInformation("Creating document {DocumentId}", document.Id);
 
         _dbContext.Documents.Add(document);
+        _auditEventWriter.Add(user.Id, user.TenantId, AuditEventTypes.DocumentCreated, "Succeeded", "Document", document.Id.ToString());
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return document;
@@ -90,6 +95,8 @@ public sealed class DocumentService : IDocumentService
 
         existingDocument.Title = title;
         existingDocument.Content = content;
+        var user = await _documentAccessService.GetRequiredCurrentUserAsync(cancellationToken);
+        _auditEventWriter.Add(user.Id, user.TenantId, AuditEventTypes.DocumentUpdated, "Succeeded", "Document", id.ToString());
 
         _logger.LogInformation("Updating document {DocumentId}", id);
 
@@ -111,6 +118,8 @@ public sealed class DocumentService : IDocumentService
             return false;
         }
 
+        var user = await _documentAccessService.GetRequiredCurrentUserAsync(cancellationToken);
+        _auditEventWriter.Add(user.Id, user.TenantId, AuditEventTypes.DocumentDeleted, "Succeeded", "Document", id.ToString());
         _dbContext.Documents.Remove(document);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -173,6 +182,7 @@ public sealed class DocumentService : IDocumentService
             document.ContentType);
 
         _dbContext.Documents.Add(document);
+        _auditEventWriter.Add(user.Id, user.TenantId, AuditEventTypes.DocumentCreated, "Succeeded", "Document", document.Id.ToString());
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return document;

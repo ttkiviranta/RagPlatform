@@ -88,11 +88,11 @@ public sealed class ApplicationInsightsTelemetryService : ITelemetryService
         _telemetryClient.TrackMetric("AverageSimilarity", averageSimilarity, properties);
     }
 
-    public void TrackRagQuery(string query, int topK, int retrievedChunkCount, int contextLength, int promptLength, double durationMs, bool success)
+    public void TrackRagQuery(int inputCharacterCount, int topK, int retrievedChunkCount, int contextLength, int promptLength, double durationMs, bool success)
     {
         var properties = new Dictionary<string, string>
         {
-            ["QueryLength"] = query.Length.ToString(),
+            ["InputCharacterCount"] = inputCharacterCount.ToString(),
             ["Success"] = success.ToString()
         };
 

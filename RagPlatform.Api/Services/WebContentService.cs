@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using HtmlAgilityPack;
+using RagPlatform.Api.Contracts.Audit;
 using RagPlatform.Api.Contracts.Authorization;
 using RagPlatform.Api.Contracts.Web;
 using RagPlatform.Api.Data;
@@ -12,17 +13,20 @@ public sealed class WebContentService : IWebContentService
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly IDocumentAccessService _documentAccessService;
+    private readonly IAuditEventWriter _auditEventWriter;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<WebContentService> _logger;
 
     public WebContentService(
         ApplicationDbContext dbContext,
         IDocumentAccessService documentAccessService,
+        IAuditEventWriter auditEventWriter,
         IHttpClientFactory httpClientFactory,
         ILogger<WebContentService> logger)
     {
         _dbContext = dbContext;
         _documentAccessService = documentAccessService;
+        _auditEventWriter = auditEventWriter;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
@@ -56,6 +60,7 @@ public sealed class WebContentService : IWebContentService
         document.TenantId = user.TenantId;
 
         _dbContext.Documents.Add(document);
+        _auditEventWriter.Add(user.Id, user.TenantId, AuditEventTypes.DocumentCreated, "Succeeded", "Document", document.Id.ToString());
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(

@@ -30,6 +30,8 @@ public sealed class ApplicationDbContext : DbContext
 
     public DbSet<ConversationMessage> ConversationMessages => Set<ConversationMessage>();
 
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -238,6 +240,51 @@ public sealed class ApplicationDbContext : DbContext
             entity.Property(message => message.CreatedAtUtc)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(message => new { message.ConversationId, message.CreatedAtUtc, message.Id });
+        });
+
+        modelBuilder.Entity<AuditEvent>(entity =>
+        {
+            entity.HasKey(auditEvent => auditEvent.Id);
+            entity.Property(auditEvent => auditEvent.TenantId)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(auditEvent => auditEvent.EventType)
+                .IsRequired()
+                .HasMaxLength(100);
+            entity.Property(auditEvent => auditEvent.Outcome)
+                .IsRequired()
+                .HasMaxLength(50);
+            entity.Property(auditEvent => auditEvent.TargetType)
+                .HasMaxLength(100);
+            entity.Property(auditEvent => auditEvent.TargetId)
+                .HasMaxLength(255);
+            entity.Property(auditEvent => auditEvent.OccurredAtUtc)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(auditEvent => auditEvent.CorrelationId)
+                .HasMaxLength(100);
+            entity.Property(auditEvent => auditEvent.HttpMethod)
+                .HasMaxLength(16);
+            entity.Property(auditEvent => auditEvent.RequestPath)
+                .HasMaxLength(2048);
+            entity.Property(auditEvent => auditEvent.DurationMilliseconds);
+            entity.Property(auditEvent => auditEvent.InputCharacterCount);
+            entity.Property(auditEvent => auditEvent.RequestedTopK);
+            entity.Property(auditEvent => auditEvent.ResultCount);
+            entity.Property(auditEvent => auditEvent.AverageSimilarity);
+            entity.Property(auditEvent => auditEvent.ContextCharacterCount);
+            entity.Property(auditEvent => auditEvent.PromptCharacterCount);
+            entity.HasIndex(auditEvent => new { auditEvent.TenantId, auditEvent.OccurredAtUtc });
+            entity.HasIndex(auditEvent => new
+            {
+                auditEvent.TenantId,
+                auditEvent.EventType,
+                auditEvent.OccurredAtUtc
+            });
+            entity.HasIndex(auditEvent => new { auditEvent.ActorUserId, auditEvent.OccurredAtUtc });
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(auditEvent => auditEvent.ActorUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

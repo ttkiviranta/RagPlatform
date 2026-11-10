@@ -11,6 +11,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Pgvector.EntityFrameworkCore;
 using RagPlatform.Api.Authorization;
+using RagPlatform.Api.Contracts.Audit;
 using RagPlatform.Api.Contracts.Authorization;
 using RagPlatform.Api.Contracts.Chunking;
 using RagPlatform.Api.Contracts.Conversations;
@@ -68,6 +69,44 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             NameClaimType = ClaimTypes.NameIdentifier,
             RoleClaimType = ClaimTypes.Role,
             ClockSkew = TimeSpan.FromMinutes(2)
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var principal = context.Principal;
+                var tenantId = principal?.FindFirst("tid")?.Value
+                    ?? principal?.FindFirst("http://schemas.microsoft.com/identity/claims/tenantid")?.Value;
+                if (string.IsNullOrWhiteSpace(tenantId))
+                {
+                    var logger = context.HttpContext.RequestServices
+                        .GetRequiredService<ILoggerFactory>()
+                        .CreateLogger("AuthenticationAudit");
+                    logger.LogWarning("A validated token did not contain a tenant identifier; no audit event was written.");
+                    return;
+                }
+
+                var entraObjectId = principal?.FindFirst("oid")?.Value
+                    ?? principal?.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier")?.Value;
+                var dbContext = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+                Guid? actorUserId = null;
+                if (!string.IsNullOrWhiteSpace(entraObjectId))
+                {
+                    actorUserId = await dbContext.Users
+                        .Where(user => user.EntraObjectId == entraObjectId && user.TenantId == tenantId)
+                        .Select(user => (Guid?)user.Id)
+                        .FirstOrDefaultAsync(context.HttpContext.RequestAborted);
+                }
+
+                var auditEventWriter = context.HttpContext.RequestServices.GetRequiredService<IAuditEventWriter>();
+                auditEventWriter.Add(
+                    actorUserId,
+                    tenantId,
+                    AuditEventTypes.AuthenticationTokenValidated,
+                    "Succeeded",
+                    "Authentication");
+                await dbContext.SaveChangesAsync(context.HttpContext.RequestAborted);
+            }
         };
     });
 
@@ -158,6 +197,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString, npgsqlOptions => npgsqlOptions.UseVector()));
 
 builder.Services.AddScoped<IHealthService, HealthService>();
+builder.Services.AddScoped<IAuditEventWriter, AuditEventWriter>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IConversationService, ConversationService>();
 builder.Services.AddScoped<IConversationMessageService, ConversationMessageService>();

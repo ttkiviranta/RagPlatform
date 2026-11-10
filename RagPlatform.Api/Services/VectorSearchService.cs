@@ -1,11 +1,13 @@
 ﻿using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Pgvector;
+using RagPlatform.Api.Contracts.Audit;
 using RagPlatform.Api.Contracts.Authorization;
 using RagPlatform.Api.Contracts.Embeddings;
 using RagPlatform.Api.Contracts.Search;
 using RagPlatform.Api.Contracts.Telemetry;
 using RagPlatform.Api.Data;
+using RagPlatform.Api.Models;
 
 namespace RagPlatform.Api.Services;
 
@@ -15,6 +17,7 @@ public sealed class VectorSearchService : IVectorSearchService
     private readonly IDocumentAccessService _documentAccessService;
     private readonly IEmbeddingProvider _embeddingProvider;
     private readonly ITelemetryService _telemetryService;
+    private readonly IAuditEventWriter _auditEventWriter;
     private readonly ILogger<VectorSearchService> _logger;
 
     public VectorSearchService(
@@ -22,12 +25,14 @@ public sealed class VectorSearchService : IVectorSearchService
         IDocumentAccessService documentAccessService,
         IEmbeddingProvider embeddingProvider,
         ITelemetryService telemetryService,
+        IAuditEventWriter auditEventWriter,
         ILogger<VectorSearchService> logger)
     {
         _dbContext = dbContext;
         _documentAccessService = documentAccessService;
         _embeddingProvider = embeddingProvider;
         _telemetryService = telemetryService;
+        _auditEventWriter = auditEventWriter;
         _logger = logger;
     }
 
@@ -47,85 +52,118 @@ public sealed class VectorSearchService : IVectorSearchService
         }
 
         var stopwatch = Stopwatch.StartNew();
+        User? currentUser = null;
+        VectorSearchResponse response;
 
         try
         {
-            var user = await _documentAccessService.GetRequiredCurrentUserAsync(cancellationToken);
+            currentUser = await _documentAccessService.GetRequiredCurrentUserAsync(cancellationToken);
             var queryVector = await _embeddingProvider.GenerateEmbeddingAsync(query, "vector-search-query", cancellationToken);
             if (queryVector.Count == 0)
             {
-                return new VectorSearchResponse
+                response = new VectorSearchResponse
                 {
                     Results = Array.Empty<VectorSearchResult>(),
                     RequestedTopK = topK,
                     GeneratedAt = DateTime.UtcNow
                 };
+
+                _telemetryService.TrackVectorSearch(
+                    "vector-search-query",
+                    topK,
+                    0,
+                    0,
+                    stopwatch.Elapsed.TotalMilliseconds,
+                    true);
+                _auditEventWriter.Add(
+                    currentUser.Id,
+                    currentUser.TenantId,
+                    AuditEventTypes.VectorSearchExecuted,
+                    "Succeeded",
+                    durationMilliseconds: stopwatch.Elapsed.TotalMilliseconds,
+                    inputCharacterCount: query.Length,
+                    requestedTopK: topK,
+                    resultCount: 0,
+                    averageSimilarity: 0);
             }
-
-            var searchVector = queryVector.ToArray();
-            var accessibleDocumentIds = _documentAccessService
-                .ScopeDocuments(_dbContext.Documents.AsNoTracking(), user)
-                .Select(document => document.Id);
-
-            var embeddings = await _dbContext.DocumentEmbeddings
-                .AsNoTracking()
-                .Include(embedding => embedding.Chunk)
-                .ThenInclude(chunk => chunk.Document)
-                .Where(embedding =>
-                    embedding.EmbeddingVector != null
-                    && accessibleDocumentIds.Contains(embedding.Chunk.DocumentId))
-                .ToListAsync(cancellationToken);
-
-            var results = embeddings
-                .Select(embedding => new
-                {
-                    DocumentId = embedding.Chunk.DocumentId,
-                    ChunkId = embedding.ChunkId,
-                    SimilarityScore = CalculateCosineSimilarity(searchVector, embedding.EmbeddingVector.ToArray()),
-                    ContentSnippet = embedding.Chunk.Content
-                })
-                .Where(item => !double.IsNaN(item.SimilarityScore))
-                .OrderByDescending(item => item.SimilarityScore)
-                .Take(topK)
-                .ToList();
-
-            var mappedResults = results
-                .Select(result => new VectorSearchResult
-                {
-                    DocumentId = result.DocumentId,
-                    ChunkId = result.ChunkId,
-                    SimilarityScore = Math.Clamp(result.SimilarityScore, 0d, 1d),
-                    ContentSnippet = TruncateContent(result.ContentSnippet)
-                })
-                .ToList();
-
-            var averageSimilarity = mappedResults.Count == 0
-                ? 0d
-                : mappedResults.Average(item => item.SimilarityScore);
-
-            _telemetryService.TrackVectorSearch(
-                "vector-search-query",
-                topK,
-                mappedResults.Count,
-                averageSimilarity,
-                stopwatch.Elapsed.TotalMilliseconds,
-                true);
-
-            _logger.LogInformation(
-                "Vector search completed for query with {ResultCount} results in {DurationMs} ms.",
-                mappedResults.Count,
-                stopwatch.Elapsed.TotalMilliseconds);
-
-            return new VectorSearchResponse
+            else
             {
-                Results = mappedResults,
-                RequestedTopK = topK,
-                GeneratedAt = DateTime.UtcNow
-            };
+                var searchVector = queryVector.ToArray();
+                var accessibleDocumentIds = _documentAccessService
+                    .ScopeDocuments(_dbContext.Documents.AsNoTracking(), currentUser)
+                    .Select(document => document.Id);
+
+                var embeddings = await _dbContext.DocumentEmbeddings
+                    .AsNoTracking()
+                    .Include(embedding => embedding.Chunk)
+                    .ThenInclude(chunk => chunk.Document)
+                    .Where(embedding =>
+                        embedding.EmbeddingVector != null
+                        && accessibleDocumentIds.Contains(embedding.Chunk.DocumentId))
+                    .ToListAsync(cancellationToken);
+
+                var results = embeddings
+                    .Select(embedding => new
+                    {
+                        DocumentId = embedding.Chunk.DocumentId,
+                        ChunkId = embedding.ChunkId,
+                        SimilarityScore = CalculateCosineSimilarity(searchVector, embedding.EmbeddingVector.ToArray()),
+                        ContentSnippet = embedding.Chunk.Content
+                    })
+                    .Where(item => !double.IsNaN(item.SimilarityScore))
+                    .OrderByDescending(item => item.SimilarityScore)
+                    .Take(topK)
+                    .ToList();
+
+                var mappedResults = results
+                    .Select(result => new VectorSearchResult
+                    {
+                        DocumentId = result.DocumentId,
+                        ChunkId = result.ChunkId,
+                        SimilarityScore = Math.Clamp(result.SimilarityScore, 0d, 1d),
+                        ContentSnippet = TruncateContent(result.ContentSnippet)
+                    })
+                    .ToList();
+
+                var averageSimilarity = mappedResults.Count == 0
+                    ? 0d
+                    : mappedResults.Average(item => item.SimilarityScore);
+
+                _telemetryService.TrackVectorSearch(
+                    "vector-search-query",
+                    topK,
+                    mappedResults.Count,
+                    averageSimilarity,
+                    stopwatch.Elapsed.TotalMilliseconds,
+                    true);
+
+                _logger.LogInformation(
+                    "Vector search completed with {ResultCount} results in {DurationMs} ms.",
+                    mappedResults.Count,
+                    stopwatch.Elapsed.TotalMilliseconds);
+
+                response = new VectorSearchResponse
+                {
+                    Results = mappedResults,
+                    RequestedTopK = topK,
+                    GeneratedAt = DateTime.UtcNow
+                };
+
+                _auditEventWriter.Add(
+                    currentUser.Id,
+                    currentUser.TenantId,
+                    AuditEventTypes.VectorSearchExecuted,
+                    "Succeeded",
+                    durationMilliseconds: stopwatch.Elapsed.TotalMilliseconds,
+                    inputCharacterCount: query.Length,
+                    requestedTopK: topK,
+                    resultCount: mappedResults.Count,
+                    averageSimilarity: averageSimilarity);
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Vector search failed for query {Query}.", query);
+            _logger.LogError(ex, "Vector search failed.");
             _telemetryService.TrackVectorSearch(
                 "vector-search-query",
                 topK,
@@ -133,8 +171,26 @@ public sealed class VectorSearchService : IVectorSearchService
                 0,
                 stopwatch.Elapsed.TotalMilliseconds,
                 false);
+            if (currentUser is not null)
+            {
+                _auditEventWriter.Add(
+                    currentUser.Id,
+                    currentUser.TenantId,
+                    AuditEventTypes.VectorSearchExecuted,
+                    "Failed",
+                    durationMilliseconds: stopwatch.Elapsed.TotalMilliseconds,
+                    inputCharacterCount: query.Length,
+                    requestedTopK: topK,
+                    resultCount: 0,
+                    averageSimilarity: 0);
+                await _auditEventWriter.FlushAsync(cancellationToken);
+            }
+
             throw;
         }
+
+        await _auditEventWriter.FlushAsync(cancellationToken);
+        return response;
     }
 
     private static double CalculateCosineSimilarity(float[] left, float[] right)
