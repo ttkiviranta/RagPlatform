@@ -11,7 +11,7 @@ The project currently demonstrates:
 - ASP.NET Core Web API
 - PostgreSQL with EF Core
 - pgvector storage and similarity search
-- document ingestion, processing, and chunking
+- foundational document upload, processing, and chunking
 - vector-based retrieval and context assembly
 - Azure AI Foundry embedding and chat inference (validated)
 - Azure Application Insights and OpenTelemetry
@@ -40,7 +40,7 @@ The platform has completed the following phases:
 - ✅ Phase 10B - Authorization & RBAC
 - ✅ Phase 10C - Conversation History
 - ✅ Phase 10D - Audit Foundation
-- ✅ Phase 11 - Azure AI Foundry RAG Integration
+- ✅ Phase 11 - Azure AI Foundry Integration
 
 ### Phase 10A validation
 
@@ -351,15 +351,15 @@ Validation completed using two separate Microsoft Entra ID users:
 - ✅ Outcomes (`Succeeded` / `Denied`) were captured correctly.
 - ✅ Audit events were persisted to PostgreSQL.
 
-Phase 10D does not include an audit-query API, retention/purge processing, or governance reporting. Those capabilities are planned for **Phase 10E - Governance Foundation**.
+Phase 10D establishes durable audit-event persistence; it does not include an audit-query API, retention/purge processing, or governance reporting. Audit investigation and governance dashboards are planned for Phase 16, while retention and purge policies remain future scope.
 
-## Phase 11 - Azure AI Foundry RAG Integration
+## Phase 11 - Azure AI Foundry Integration
 
 **Status:** ✅ Complete
 
 **Validation:** ✅ Successful
 
-Phase 11 connects the existing owner-scoped vector retrieval, context builder, and prompt builder to Azure AI Foundry model deployments. `POST /api/rag/query` now returns a generated answer and source identifiers with similarity scores. Agents, tool calling, Copilot Studio, and Azure AI Search are not part of this phase.
+Phase 11 delivers the AI foundation by connecting the existing retrieval pipeline to Azure AI Foundry embedding and chat deployments. It validates model connectivity, embedding generation, vector storage, retrieval, and auditing. Foundational document APIs exist, but the complete business-document import and knowledge-base population pipeline is planned for Phase 12. Phase 13 will build out document Q&A over that populated corpus. Agents, tool calling, Copilot Studio, and Azure AI Search are not part of Phase 11.
 
 ### Implementation
 
@@ -371,6 +371,10 @@ Phase 11 connects the existing owner-scoped vector retrieval, context builder, a
 - Returns the answer and retrieved document/chunk identifiers without returning the assembled prompt or raw context.
 - Accepts an optional owner-scoped `conversationId`; recent messages are supplied as conversation context, and successful exchanges are persisted as user and assistant messages.
 - Records `FoundryModelInvocation` audit events for embedding and chat calls, including operation, deployment, duration, and available token counts. Audit records contain operational metadata only, not query, prompt, document, conversation-message, or model-response content.
+
+### Architecture boundary
+
+RagPlatform owns document records, chunks, embeddings, and vector search, with PostgreSQL and pgvector as its persistence and retrieval layer. Azure AI Foundry generates embeddings and LLM responses for inference; it is not used as document storage. Generated vectors are stored and searched by RagPlatform.
 
 ### Configuration
 
@@ -423,7 +427,9 @@ dotnet ef database update
 Phase 11 validation completed successfully:
 
 - ✅ Entra ID authentication and Foundry inference succeeded with the configured resource endpoint.
-- ✅ `text-embedding-ada-002` generated and persisted embeddings with the configured dimensions.
+- ✅ `text-embedding-ada-002` generated 1536-dimensional vectors, which were stored successfully.
+- ✅ `Foundry User` and `Cognitive Services User` permissions were validated for the inference identity.
+- ✅ The end-to-end `Document Chunk → Foundry Embedding → Vector Storage` flow was proven.
 - ✅ `gpt-35-turbo` returned grounded answers with retrieved source identifiers through `POST /api/rag/query`.
 - ✅ Vector search used embeddings from the configured deployment, while existing ownership and tenant scoping remained enforced.
 - ✅ Optional conversation context remained owner-scoped.
@@ -796,36 +802,49 @@ The collection includes requests to create a conversation and add a user message
 - ✅ Phase 10C - Conversation History
 - ✅ Phase 10D - Audit Foundation
 
-### 🚧 Governance Layer
+### ✅ AI Foundation
 
-Establish controlled access to audit data, lifecycle management, and compliance-ready reporting.
+- ✅ Phase 11 - Azure AI Foundry Integration
+  - Azure AI Foundry connectivity
+  - Embedding generation
+  - Vector storage integration
+  - Retrieval foundation
+  - Audit instrumentation
+  - Production validation completed
 
-- ⬜ Phase 10E - Governance Foundation
-  - Tenant-scoped Audit Query API
-  - Retention & Purge Policies
-  - Governance Reporting
-  - Compliance Foundations
+### 🚧 Knowledge Ingestion & Q&A
 
-### 🤖 AI Layer
+Document Import & Knowledge Ingestion is the logical next phase: model inference and vector storage are validated, but business documents still need a reliable path from import and text extraction through chunking and embedding to a populated, searchable knowledge base. Copilot Studio and document Q&A depend on that content pipeline.
 
-Connect the secured retrieval platform to AI services, then make its capabilities available through Copilot Studio.
+- ⬜ Phase 12 - Document Import & Knowledge Ingestion
+  - PDF import
+  - Text extraction
+  - Document persistence
+  - Chunk generation
+  - Embedding generation
+  - Vector storage
+  - Import status tracking
+  - Knowledge-base population
+- ⬜ Phase 13 - Document Q&A
+  - Ask questions against imported documents
+  - Source citations
+  - Retrieval validation
+  - Multi-document retrieval
+  - Context-grounded responses
 
-- ✅ Phase 11 - Azure AI Foundry RAG Integration
-  - ✅ Azure AI Foundry connectivity and model invocation
-  - ✅ Grounded RAG response and source metadata
-  - ✅ AI invocation auditing with content-free operational metadata
-  - ✅ Optional conversation-aware responses
-  - ✅ Live end-to-end validation with configured deployments
-- ⬜ Phase 12 - Copilot Studio Integration
+### 🤖 Copilot Integration
+
+- ⬜ Phase 14 - Copilot Studio Integration
   - External Copilot integration
   - Business workflow orchestration
   - API consumption through Copilot Studio
+  - Enterprise Copilot connectivity
 
 ### 🧠 Advanced Knowledge Layer
 
 Extend retrieval beyond vector similarity to include explicit knowledge relationships.
 
-- ⬜ Phase 13 - GraphRAG
+- ⬜ Phase 15 - GraphRAG
   - Knowledge graph enrichment
   - Relationship-aware retrieval
   - Hybrid vector + graph retrieval
@@ -834,7 +853,7 @@ Extend retrieval beyond vector similarity to include explicit knowledge relation
 
 Add operator-facing capabilities for managing users, roles, governance, and audit investigations.
 
-- ⬜ Phase 14 - Administration Portal
+- ⬜ Phase 16 - Administration Portal
   - User administration
   - Role management
   - Governance dashboards
@@ -844,7 +863,7 @@ Add operator-facing capabilities for managing users, roles, governance, and audi
 
 Introduce repeatable AI development, evaluation, governance, and operational cost controls.
 
-- ⬜ Phase 15 - AI SDLC, MLOps & LLMOps
+- ⬜ Phase 17 - AI SDLC, MLOps & LLMOps
   - Prompt Registry
   - Model Registry
   - Evaluation Pipelines
@@ -852,9 +871,9 @@ Introduce repeatable AI development, evaluation, governance, and operational cos
   - AI Governance
   - AI Observability
 
-## Azure AI Foundry Vision
+## Azure AI Foundry Scope
 
-Phase 11 connects the existing retrieval pipeline to Azure AI Foundry chat and embedding deployments, and has been validated end to end.
+The validated Foundry integration is an inference boundary: Foundry generates embeddings and LLM responses, while RagPlatform retains ownership of documents, chunks, embeddings, and vector search.
 
 ### Future Foundry capabilities
 
