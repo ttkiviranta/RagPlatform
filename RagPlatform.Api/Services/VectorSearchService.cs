@@ -53,12 +53,14 @@ public sealed class VectorSearchService : IVectorSearchService
 
         var stopwatch = Stopwatch.StartNew();
         User? currentUser = null;
+        var embeddingModelName = "unknown";
         VectorSearchResponse response;
 
         try
         {
             currentUser = await _documentAccessService.GetRequiredCurrentUserAsync(cancellationToken);
-            var queryVector = await _embeddingProvider.GenerateEmbeddingAsync(query, "vector-search-query", cancellationToken);
+            embeddingModelName = _embeddingProvider.ModelName;
+            var queryVector = await _embeddingProvider.GenerateEmbeddingAsync(query, cancellationToken: cancellationToken);
             if (queryVector.Count == 0)
             {
                 response = new VectorSearchResponse
@@ -69,7 +71,7 @@ public sealed class VectorSearchService : IVectorSearchService
                 };
 
                 _telemetryService.TrackVectorSearch(
-                    "vector-search-query",
+                    embeddingModelName,
                     topK,
                     0,
                     0,
@@ -99,6 +101,7 @@ public sealed class VectorSearchService : IVectorSearchService
                     .ThenInclude(chunk => chunk.Document)
                     .Where(embedding =>
                         embedding.EmbeddingVector != null
+                        && embedding.ModelName == _embeddingProvider.ModelName
                         && accessibleDocumentIds.Contains(embedding.Chunk.DocumentId))
                     .ToListAsync(cancellationToken);
 
@@ -130,7 +133,7 @@ public sealed class VectorSearchService : IVectorSearchService
                     : mappedResults.Average(item => item.SimilarityScore);
 
                 _telemetryService.TrackVectorSearch(
-                    "vector-search-query",
+                    embeddingModelName,
                     topK,
                     mappedResults.Count,
                     averageSimilarity,
@@ -165,7 +168,7 @@ public sealed class VectorSearchService : IVectorSearchService
         {
             _logger.LogError(ex, "Vector search failed.");
             _telemetryService.TrackVectorSearch(
-                "vector-search-query",
+                embeddingModelName,
                 topK,
                 0,
                 0,

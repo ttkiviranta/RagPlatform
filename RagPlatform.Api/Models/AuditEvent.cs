@@ -37,4 +37,14 @@ public sealed class AuditEvent
     public int? ContextCharacterCount { get; set; }
 
     public int? PromptCharacterCount { get; set; }
+
+    public string? ModelProvider { get; set; }
+
+    public string? ModelDeployment { get; set; }
+
+    public string? ModelOperation { get; set; }
+
+    public int? InputTokenCount { get; set; }
+
+    public int? OutputTokenCount { get; set; }
 }

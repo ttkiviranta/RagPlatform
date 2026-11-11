@@ -31,7 +31,12 @@ public sealed class AuditEventWriter : IAuditEventWriter
         int? resultCount = null,
         double? averageSimilarity = null,
         int? contextCharacterCount = null,
-        int? promptCharacterCount = null)
+        int? promptCharacterCount = null,
+        string? modelProvider = null,
+        string? modelDeployment = null,
+        string? modelOperation = null,
+        int? inputTokenCount = null,
+        int? outputTokenCount = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
         ArgumentException.ThrowIfNullOrWhiteSpace(eventType);
@@ -56,7 +61,12 @@ public sealed class AuditEventWriter : IAuditEventWriter
             ResultCount = resultCount,
             AverageSimilarity = averageSimilarity,
             ContextCharacterCount = contextCharacterCount,
-            PromptCharacterCount = promptCharacterCount
+            PromptCharacterCount = promptCharacterCount,
+            ModelProvider = modelProvider,
+            ModelDeployment = modelDeployment,
+            ModelOperation = modelOperation,
+            InputTokenCount = inputTokenCount,
+            OutputTokenCount = outputTokenCount
         });
     }
 

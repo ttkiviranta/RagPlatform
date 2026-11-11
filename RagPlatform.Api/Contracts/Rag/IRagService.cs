@@ -5,5 +5,6 @@ public interface IRagService
     Task<RagQueryResponse> QueryAsync(
         string query,
         int topK = 5,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        Guid? conversationId = null);
 }

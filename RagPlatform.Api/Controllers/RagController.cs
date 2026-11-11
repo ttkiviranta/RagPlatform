@@ -22,14 +22,15 @@ public sealed class RagController : ControllerBase
     }
 
     /// <summary>
-    /// Executes a retrieval-augmented generation query using the vector search foundation and prompt assembly pipeline.
+    /// Executes a grounded retrieval-augmented generation query.
     /// </summary>
-    /// <param name="request">The user question and optional top-k retrieval count.</param>
+    /// <param name="request">The user question, retrieval count, and optional owned conversation.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>The retrieved chunk metadata, generated context, and prompt payload.</returns>
+    /// <returns>The generated answer and references to its retrieved sources.</returns>
     [HttpPost("rag/query")]
     [ProducesResponseType(typeof(RagQueryResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<RagQueryResponse>> QueryAsync(
         [FromBody] RagQueryRequest request,
@@ -42,8 +43,16 @@ public sealed class RagController : ControllerBase
 
         try
         {
-            var response = await _ragService.QueryAsync(request.Query, request.TopK, cancellationToken);
+            var response = await _ragService.QueryAsync(
+                request.Query,
+                request.TopK,
+                cancellationToken,
+                request.ConversationId);
             return Ok(response);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
         }
         catch (ArgumentOutOfRangeException ex)
         {

@@ -61,8 +61,14 @@ public sealed class EmbeddingService : IEmbeddingService
             var chunk = await _dbContext.DocumentChunks
                 .FirstAsync(item => item.Id == chunkId, cancellationToken);
             var resolvedModelName = string.IsNullOrWhiteSpace(modelName)
-                ? "placeholder-embedding-model"
+                ? _embeddingProvider.ModelName
                 : modelName.Trim();
+            if (!string.Equals(resolvedModelName, _embeddingProvider.ModelName, StringComparison.Ordinal))
+            {
+                throw new ArgumentException(
+                    $"Only the configured embedding deployment '{_embeddingProvider.ModelName}' can be used.",
+                    nameof(modelName));
+            }
 
             var vector = await _embeddingProvider.GenerateEmbeddingAsync(
                 chunk.Content,

@@ -2,6 +2,8 @@
 using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.Extensibility;
 using System.Security.Claims;
+using Azure.Core;
+using Azure.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -25,10 +27,19 @@ using RagPlatform.Api.Contracts.Search;
 using RagPlatform.Api.Contracts.Telemetry;
 using RagPlatform.Api.Contracts.Web;
 using RagPlatform.Api.Data;
+using RagPlatform.Api.Options;
 using RagPlatform.Api.Providers;
 using RagPlatform.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.Configure<FoundryOptions>(
+    builder.Configuration.GetSection(FoundryOptions.SectionName));
+builder.Services.AddSingleton<TokenCredential>(_ => new DefaultAzureCredential());
+builder.Services.AddHttpClient("FoundryInference", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
+builder.Services.AddScoped<FoundryInferenceClient>();
 
 var azureAdAuthority = builder.Configuration["AzureAd:Authority"]
     ?? $"https://login.microsoftonline.com/{builder.Configuration["AzureAd:TenantId"]}";
@@ -205,12 +216,13 @@ builder.Services.AddScoped<IPlainTextProcessor, PlainTextProcessor>();
 builder.Services.AddScoped<IMarkdownProcessor, MarkdownProcessor>();
 builder.Services.AddScoped<IWebContentService, WebContentService>();
 builder.Services.AddScoped<IDocumentChunkingService, DocumentChunkingService>();
-builder.Services.AddScoped<IEmbeddingProvider, PlaceholderEmbeddingProvider>();
+builder.Services.AddScoped<IEmbeddingProvider, FoundryEmbeddingProvider>();
 builder.Services.AddScoped<IEmbeddingService, EmbeddingService>();
 builder.Services.AddScoped<IVectorSearchService, VectorSearchService>();
 builder.Services.AddScoped<IContextBuilder, ContextBuilder>();
 builder.Services.AddScoped<IPromptBuilder, PromptBuilder>();
 builder.Services.AddScoped<IRagService, RagService>();
+builder.Services.AddScoped<IFoundryChatCompletionService, FoundryChatCompletionService>();
 builder.Services.AddScoped<ITelemetryService, ApplicationInsightsTelemetryService>();
 builder.Services.AddScoped<IUserBootstrapService, UserBootstrapService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();

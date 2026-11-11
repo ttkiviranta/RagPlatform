@@ -14,4 +14,5 @@ public static class AuditEventTypes
     public const string ConversationAccessDenied = "ConversationAccessDenied";
     public const string VectorSearchExecuted = "VectorSearchExecuted";
     public const string RagQueryExecuted = "RagQueryExecuted";
+    public const string FoundryModelInvocation = "FoundryModelInvocation";
 }

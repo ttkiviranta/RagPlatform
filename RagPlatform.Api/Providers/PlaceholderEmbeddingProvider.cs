@@ -6,6 +6,8 @@ public sealed class PlaceholderEmbeddingProvider : IEmbeddingProvider
 {
     public string ProviderName => "PlaceholderEmbeddingProvider";
 
+    public string ModelName => "placeholder-embedding-model";
+
     public Task<IReadOnlyList<float>> GenerateEmbeddingAsync(
         string content,
         string? modelName = null,

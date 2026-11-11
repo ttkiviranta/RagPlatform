@@ -10,4 +10,15 @@ public interface IConversationMessageService
         Guid conversationId,
         CreateConversationMessageRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ConversationMessageResponse>?> GetRecentMessagesAsync(
+        Guid conversationId,
+        int maxCount,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> AppendExchangeAsync(
+        Guid conversationId,
+        string userContent,
+        string assistantContent,
+        CancellationToken cancellationToken = default);
 }

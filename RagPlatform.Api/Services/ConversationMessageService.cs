@@ -109,6 +109,93 @@ public sealed class ConversationMessageService : IConversationMessageService
         };
     }
 
+    public async Task<IReadOnlyList<ConversationMessageResponse>?> GetRecentMessagesAsync(
+        Guid conversationId,
+        int maxCount,
+        CancellationToken cancellationToken = default)
+    {
+        if (maxCount <= 0 || maxCount > 50)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxCount), "Message history must be between 1 and 50 messages.");
+        }
+
+        var currentUser = await GetRequiredCurrentUserAsync(cancellationToken);
+        var ownsConversation = await _dbContext.Conversations
+            .AnyAsync(
+                conversation => conversation.Id == conversationId && conversation.UserId == currentUser.Id,
+                cancellationToken);
+        if (!ownsConversation)
+        {
+            if (await _dbContext.Conversations.AnyAsync(conversation => conversation.Id == conversationId, cancellationToken))
+            {
+                await RecordDeniedAccessAsync(currentUser, conversationId, cancellationToken);
+            }
+
+            return null;
+        }
+
+        var messages = await _dbContext.ConversationMessages
+            .AsNoTracking()
+            .Where(message =>
+                message.ConversationId == conversationId
+                && message.Conversation!.UserId == currentUser.Id)
+            .OrderByDescending(message => message.CreatedAtUtc)
+            .ThenByDescending(message => message.Id)
+            .Take(maxCount)
+            .ToListAsync(cancellationToken);
+
+        return messages
+            .OrderBy(message => message.CreatedAtUtc)
+            .ThenBy(message => message.Id)
+            .Select(MapMessage)
+            .ToList();
+    }
+
+    public async Task<bool> AppendExchangeAsync(
+        Guid conversationId,
+        string userContent,
+        string assistantContent,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userContent);
+        ArgumentException.ThrowIfNullOrWhiteSpace(assistantContent);
+
+        var currentUser = await GetRequiredCurrentUserAsync(cancellationToken);
+        var conversation = await _dbContext.Conversations
+            .FirstOrDefaultAsync(
+                item => item.Id == conversationId && item.UserId == currentUser.Id,
+                cancellationToken);
+        if (conversation is null)
+        {
+            if (await _dbContext.Conversations.AnyAsync(item => item.Id == conversationId, cancellationToken))
+            {
+                await RecordDeniedAccessAsync(currentUser, conversationId, cancellationToken);
+            }
+
+            return false;
+        }
+
+        var now = DateTime.UtcNow;
+        _dbContext.ConversationMessages.AddRange(
+            new ConversationMessage
+            {
+                ConversationId = conversation.Id,
+                Role = ConversationMessageRole.User,
+                Content = userContent,
+                CreatedAtUtc = now
+            },
+            new ConversationMessage
+            {
+                ConversationId = conversation.Id,
+                Role = ConversationMessageRole.Assistant,
+                Content = assistantContent,
+                CreatedAtUtc = now.AddMilliseconds(1)
+            });
+        conversation.UpdatedAtUtc = now.AddMilliseconds(1);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     private async Task RecordDeniedAccessAsync(User currentUser, Guid conversationId, CancellationToken cancellationToken)
     {
         _auditEventWriter.Add(
@@ -119,6 +206,18 @@ public sealed class ConversationMessageService : IConversationMessageService
             "Conversation",
             conversationId.ToString());
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static ConversationMessageResponse MapMessage(ConversationMessage message)
+    {
+        return new ConversationMessageResponse
+        {
+            Id = message.Id,
+            ConversationId = message.ConversationId,
+            Role = message.Role.ToString(),
+            Content = message.Content,
+            CreatedAtUtc = message.CreatedAtUtc
+        };
     }
 
     private async Task<User> GetRequiredCurrentUserAsync(CancellationToken cancellationToken)

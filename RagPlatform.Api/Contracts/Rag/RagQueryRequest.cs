@@ -10,4 +10,6 @@ public sealed class RagQueryRequest
 
     [Range(1, 20)]
     public int TopK { get; set; } = 5;
+
+    public Guid? ConversationId { get; set; }
 }

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using RagPlatform.Api.Contracts.Audit;
+using RagPlatform.Api.Contracts.Conversations;
 using RagPlatform.Api.Contracts.Identity;
 using RagPlatform.Api.Contracts.Rag;
 using RagPlatform.Api.Contracts.Search;
@@ -9,12 +10,15 @@ namespace RagPlatform.Api.Services;
 
 public sealed class RagService : IRagService
 {
+    private const int MaxConversationHistoryCharacters = 4000;
     private readonly IVectorSearchService _vectorSearchService;
     private readonly IContextBuilder _contextBuilder;
     private readonly IPromptBuilder _promptBuilder;
     private readonly ITelemetryService _telemetryService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IAuditEventWriter _auditEventWriter;
+    private readonly IConversationMessageService _conversationMessageService;
+    private readonly IFoundryChatCompletionService _chatCompletionService;
     private readonly ILogger<RagService> _logger;
 
     public RagService(
@@ -24,6 +28,8 @@ public sealed class RagService : IRagService
         ITelemetryService telemetryService,
         ICurrentUserService currentUserService,
         IAuditEventWriter auditEventWriter,
+        IConversationMessageService conversationMessageService,
+        IFoundryChatCompletionService chatCompletionService,
         ILogger<RagService> logger)
     {
         _vectorSearchService = vectorSearchService;
@@ -32,13 +38,16 @@ public sealed class RagService : IRagService
         _telemetryService = telemetryService;
         _currentUserService = currentUserService;
         _auditEventWriter = auditEventWriter;
+        _conversationMessageService = conversationMessageService;
+        _chatCompletionService = chatCompletionService;
         _logger = logger;
     }
 
     public async Task<RagQueryResponse> QueryAsync(
         string query,
         int topK = 5,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? conversationId = null)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
@@ -64,6 +73,16 @@ public sealed class RagService : IRagService
 
         try
         {
+            IReadOnlyList<ConversationMessageResponse> conversationHistory = Array.Empty<ConversationMessageResponse>();
+            if (conversationId.HasValue)
+            {
+                conversationHistory = await _conversationMessageService.GetRecentMessagesAsync(
+                    conversationId.Value,
+                    10,
+                    cancellationToken)
+                    ?? throw new KeyNotFoundException($"Conversation {conversationId.Value} was not found.");
+            }
+
             var searchResponse = await _vectorSearchService.SearchAsync(query, topK, cancellationToken);
             var retrievedChunks = searchResponse.Results
                 .Select(result => new RagRetrievedChunk
@@ -79,6 +98,26 @@ public sealed class RagService : IRagService
             var generatedPrompt = _promptBuilder.BuildPrompt(query, generatedContext);
             contextCharacterCount = generatedContext.Length;
             promptCharacterCount = generatedPrompt.Length;
+            var chatMessages = BuildConversationHistory(conversationHistory);
+            chatMessages.Add(new RagChatMessage
+            {
+                Role = "User",
+                Content = generatedPrompt
+            });
+            var completion = await _chatCompletionService.CompleteAsync(
+                _promptBuilder.BuildSystemPrompt(),
+                chatMessages,
+                cancellationToken);
+
+            if (conversationId.HasValue
+                && !await _conversationMessageService.AppendExchangeAsync(
+                    conversationId.Value,
+                    query,
+                    completion.Answer,
+                    cancellationToken))
+            {
+                throw new KeyNotFoundException($"Conversation {conversationId.Value} was not found.");
+            }
 
             _telemetryService.TrackRagQuery(
                 query.Length,
@@ -96,9 +135,9 @@ public sealed class RagService : IRagService
             response = new RagQueryResponse
             {
                 Query = query,
-                RetrievedChunks = retrievedChunks,
-                GeneratedContext = generatedContext,
-                GeneratedPrompt = generatedPrompt,
+                Answer = completion.Answer,
+                Sources = retrievedChunks,
+                ConversationId = conversationId,
                 GeneratedAt = DateTime.UtcNow
             };
         }
@@ -141,5 +180,42 @@ public sealed class RagService : IRagService
             promptCharacterCount: promptCharacterCount);
         await _auditEventWriter.FlushAsync(cancellationToken);
         return response;
+    }
+
+    private static List<RagChatMessage> BuildConversationHistory(
+        IReadOnlyList<ConversationMessageResponse> conversationHistory)
+    {
+        var selectedMessages = new List<RagChatMessage>();
+        var remainingCharacters = MaxConversationHistoryCharacters;
+
+        foreach (var message in conversationHistory.Reverse())
+        {
+            if (remainingCharacters == 0)
+            {
+                break;
+            }
+
+            if (!string.Equals(message.Role, "User", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(message.Role, "Assistant", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var content = message.Content;
+            if (content.Length > remainingCharacters)
+            {
+                content = content[^remainingCharacters..];
+            }
+
+            selectedMessages.Add(new RagChatMessage
+            {
+                Role = message.Role,
+                Content = content
+            });
+            remainingCharacters -= content.Length;
+        }
+
+        selectedMessages.Reverse();
+        return selectedMessages;
     }
 }

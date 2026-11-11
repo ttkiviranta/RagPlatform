@@ -15,7 +15,12 @@ public interface IAuditEventWriter
         int? resultCount = null,
         double? averageSimilarity = null,
         int? contextCharacterCount = null,
-        int? promptCharacterCount = null);
+        int? promptCharacterCount = null,
+        string? modelProvider = null,
+        string? modelDeployment = null,
+        string? modelOperation = null,
+        int? inputTokenCount = null,
+        int? outputTokenCount = null);
 
     Task FlushAsync(CancellationToken cancellationToken = default);
 }

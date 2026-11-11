@@ -273,6 +273,14 @@ public sealed class ApplicationDbContext : DbContext
             entity.Property(auditEvent => auditEvent.AverageSimilarity);
             entity.Property(auditEvent => auditEvent.ContextCharacterCount);
             entity.Property(auditEvent => auditEvent.PromptCharacterCount);
+            entity.Property(auditEvent => auditEvent.ModelProvider)
+                .HasMaxLength(100);
+            entity.Property(auditEvent => auditEvent.ModelDeployment)
+                .HasMaxLength(200);
+            entity.Property(auditEvent => auditEvent.ModelOperation)
+                .HasMaxLength(100);
+            entity.Property(auditEvent => auditEvent.InputTokenCount);
+            entity.Property(auditEvent => auditEvent.OutputTokenCount);
             entity.HasIndex(auditEvent => new { auditEvent.TenantId, auditEvent.OccurredAtUtc });
             entity.HasIndex(auditEvent => new
             {

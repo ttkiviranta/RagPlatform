@@ -58,6 +58,21 @@ namespace RagPlatform.Api.Data.Migrations
                     b.Property<int?>("InputCharacterCount")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("InputTokenCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ModelDeployment")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ModelOperation")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ModelProvider")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<DateTime>("OccurredAtUtc")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -67,6 +82,9 @@ namespace RagPlatform.Api.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
+
+                    b.Property<int?>("OutputTokenCount")
+                        .HasColumnType("integer");
 
                     b.Property<int?>("PromptCharacterCount")
                         .HasColumnType("integer");
