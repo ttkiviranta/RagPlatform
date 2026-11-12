@@ -814,7 +814,7 @@ The collection includes requests to create a conversation and add a user message
 
 ### 🚧 Knowledge Ingestion & Q&A
 
-Document Import & Knowledge Ingestion is the logical next phase: Phase 11 validated model inference and vector storage, but business documents still need a reliable, managed path from PDF upload and text extraction through chunking and embedding to a populated, searchable knowledge base. Document list and delete operations belong in this phase because they provide users the lifecycle controls needed to manage the knowledge they import, including cleanup of derived chunks and vectors. Document Q&A and Copilot integration depend on that dependable content pipeline.
+Document Import & Knowledge Ingestion is the logical next phase: Phase 11 validated model inference and vector storage, but business documents still need a reliable, managed path from PDF upload and text extraction through chunking and embedding to a populated, searchable knowledge base. Document list and delete operations belong in this phase because they provide users the lifecycle controls needed to manage the knowledge they import, including cleanup of derived chunks and vectors. Phase 12 uses Azure Service Bus and a background worker to process long-running imports asynchronously, build event-driven architecture experience, and support retry handling. Document Q&A and Copilot integration depend on that dependable content pipeline.
 
 - ⬜ Phase 12 - Document Import & Knowledge Ingestion
   - Upload PDF documents
@@ -828,7 +828,10 @@ Document Import & Knowledge Ingestion is the logical next phase: Phase 11 valida
   - Report import status
   - Populate the searchable knowledge base
   - Require each imported document to include `DocumentId`, `Title`, `FileName`, `CreatedAt`, `UpdatedAt`, and `OwnerUserId`
-  - Defer web crawling, URL ingestion, OCR, SharePoint/OneDrive import, document versioning, and automatic document updates
+  - Publish import work to Azure Service Bus for asynchronous processing by a document import worker
+  - Retry transient processing failures and report terminal import status
+  - Do not retain original PDF files after text extraction
+  - Defer OCR, SharePoint/OneDrive import, URL crawling, web crawler ingestion, document versioning, and automatic document refresh
 - ⬜ Phase 13 - Document Q&A
   - Ask questions against imported documents
   - Source citations
@@ -877,7 +880,45 @@ Introduce repeatable AI development, evaluation, governance, and operational cos
 
 ## Azure AI Foundry Scope
 
-The validated Foundry integration is an inference boundary. RagPlatform owns `Documents`, `DocumentChunks`, and `DocumentEmbeddings`, including PostgreSQL/pgvector persistence and vector search. Azure AI Foundry provides embedding generation, chat completions, and model inference; it does not store documents, chunks, embeddings, or vectors. Embeddings returned by Foundry are persisted and searched by RagPlatform.
+The validated Foundry integration is an inference boundary. RagPlatform owns `Documents`, `DocumentChunks`, and `DocumentEmbeddings`, including PostgreSQL/pgvector persistence, vector search, and audit data. Azure AI Foundry provides embedding generation, chat completions, and model inference; it does not store documents, chunks, embeddings, or vectors. Embeddings returned by Foundry are persisted and searched by RagPlatform. Original PDF files are not retained as document assets in the Phase 12 MVP.
+
+## Phase 12 Architecture
+
+### Asynchronous import flow
+
+```text
+User uploads PDF
+        ↓
+API validates the upload and creates the Document record
+        ↓
+Import status = Queued
+        ↓
+Azure Service Bus import message
+        ↓
+Document Import Worker
+        ↓
+PDF text extraction
+        ↓
+DocumentChunk generation
+        ↓
+Azure AI Foundry embedding generation
+        ↓
+Store DocumentEmbeddings in PostgreSQL/pgvector
+        ↓
+Import status = Completed
+```
+
+The worker uses the document identifier to coordinate processing and updates the persisted import status on success or terminal failure. Service Bus decouples the upload request from long-running PDF and model operations, allowing imports to run in the background, transient failures to be retried, and worker capacity to be scaled independently. This is also an intentional learning objective for Azure Service Bus, background workers, event-driven architecture, retry handling, and long-running AI workflows.
+
+Because original PDFs are not retained and Service Bus messages should not carry document binaries, the upload flow requires a short-lived, access-controlled staging location that the worker can read. The staging copy is temporary transfer data, not the document store, and must be deleted after extraction (including through expiry/cleanup if processing fails). Only the extracted text and document metadata are retained by RagPlatform. The exact staging mechanism is an implementation decision to confirm before coding.
+
+### Ownership boundaries
+
+- **RagPlatform** owns document records and extracted text, chunks, embeddings, PostgreSQL/pgvector storage, vector search, import status, and audit data.
+- **Azure Service Bus** transports import work notifications; it is not document or vector storage.
+- **Document Import Worker** extracts text, creates chunks, calls Foundry for embeddings, persists results in RagPlatform, and records the final status.
+- **Azure AI Foundry** provides embedding generation and chat/model inference only.
+- **Temporary PDF staging** exists only until extraction and is deleted afterward; it is not retained as a user-accessible document asset.
 
 ### Future Foundry capabilities
 
@@ -887,7 +928,7 @@ The validated Foundry integration is an inference boundary. RagPlatform owns `Do
 
 ## Future Document Ingestion Candidates
 
-Potential extensions beyond the Phase 12 MVP include document versioning, URL import, web crawling, OCR, SharePoint ingestion, and OneDrive ingestion. These are candidates for future planning, not Phase 12 deliverables.
+Potential extensions beyond the Phase 12 MVP include OCR, URL import, web crawling, SharePoint ingestion, OneDrive ingestion, and document versioning. These are candidates for future planning, not Phase 12 deliverables.
 
 ## Copilot Studio Vision
 
