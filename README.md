@@ -814,17 +814,21 @@ The collection includes requests to create a conversation and add a user message
 
 ### 🚧 Knowledge Ingestion & Q&A
 
-Document Import & Knowledge Ingestion is the logical next phase: model inference and vector storage are validated, but business documents still need a reliable path from import and text extraction through chunking and embedding to a populated, searchable knowledge base. Copilot Studio and document Q&A depend on that content pipeline.
+Document Import & Knowledge Ingestion is the logical next phase: Phase 11 validated model inference and vector storage, but business documents still need a reliable, managed path from PDF upload and text extraction through chunking and embedding to a populated, searchable knowledge base. Document list and delete operations belong in this phase because they provide users the lifecycle controls needed to manage the knowledge they import, including cleanup of derived chunks and vectors. Document Q&A and Copilot integration depend on that dependable content pipeline.
 
 - ⬜ Phase 12 - Document Import & Knowledge Ingestion
-  - PDF import
-  - Text extraction
-  - Document persistence
-  - Chunk generation
-  - Embedding generation
-  - Vector storage
-  - Import status tracking
-  - Knowledge-base population
+  - Upload PDF documents
+  - Extract text from PDFs
+  - Create and persist document records
+  - Generate document chunks
+  - Generate embeddings using Azure AI Foundry
+  - Store embeddings in PostgreSQL/pgvector
+  - List imported documents
+  - Delete imported documents and their document, chunk, and embedding records
+  - Report import status
+  - Populate the searchable knowledge base
+  - Require each imported document to include `DocumentId`, `Title`, `FileName`, `CreatedAt`, `UpdatedAt`, and `OwnerUserId`
+  - Defer web crawling, URL ingestion, OCR, SharePoint/OneDrive import, document versioning, and automatic document updates
 - ⬜ Phase 13 - Document Q&A
   - Ask questions against imported documents
   - Source citations
@@ -873,13 +877,17 @@ Introduce repeatable AI development, evaluation, governance, and operational cos
 
 ## Azure AI Foundry Scope
 
-The validated Foundry integration is an inference boundary: Foundry generates embeddings and LLM responses, while RagPlatform retains ownership of documents, chunks, embeddings, and vector search.
+The validated Foundry integration is an inference boundary. RagPlatform owns `Documents`, `DocumentChunks`, and `DocumentEmbeddings`, including PostgreSQL/pgvector persistence and vector search. Azure AI Foundry provides embedding generation, chat completions, and model inference; it does not store documents, chunks, embeddings, or vectors. Embeddings returned by Foundry are persisted and searched by RagPlatform.
 
 ### Future Foundry capabilities
 
 - orchestration for AI workflows
 - evaluation and governance layering
 - centralized AI telemetry and monitoring
+
+## Future Document Ingestion Candidates
+
+Potential extensions beyond the Phase 12 MVP include document versioning, URL import, web crawling, OCR, SharePoint ingestion, and OneDrive ingestion. These are candidates for future planning, not Phase 12 deliverables.
 
 ## Copilot Studio Vision
 
