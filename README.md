@@ -828,9 +828,12 @@ Document Import & Knowledge Ingestion is the logical next phase: Phase 11 valida
   - Report import status
   - Populate the searchable knowledge base
   - Require each imported document to include `DocumentId`, `Title`, `FileName`, `CreatedAt`, `UpdatedAt`, and `OwnerUserId`
-  - Publish import work to Azure Service Bus for asynchronous processing by a document import worker
+  - Stage uploads temporarily in Azure Blob Storage and publish import work to Azure Service Bus
+  - Process messages using a `BackgroundService` and `ServiceBusProcessor` hosted in `RagPlatform.Api`
+  - Extract PDF text with PdfPig; delete the staging blob after successful extraction
   - Retry transient processing failures and report terminal import status
-  - Do not retain original PDF files after text extraction
+  - Do not retain original PDF files after successful extraction; allow temporary retention for retries and clean up abandoned blobs through a lifecycle policy
+  - Keep the existing solution structure: no dedicated worker project, outbox pattern, or major project split in this MVP
   - Defer OCR, SharePoint/OneDrive import, URL crawling, web crawler ingestion, document versioning, and automatic document refresh
 - ⬜ Phase 13 - Document Q&A
   - Ask questions against imported documents
@@ -889,15 +892,21 @@ The validated Foundry integration is an inference boundary. RagPlatform owns `Do
 ```text
 User uploads PDF
         ↓
-API validates the upload and creates the Document record
+API validates the upload
         ↓
-Import status = Queued
+Temporary Azure Blob Storage staging
         ↓
-Azure Service Bus import message
+Create Document (Status = Queued)
         ↓
-Document Import Worker
+Azure Service Bus
         ↓
-PDF text extraction
+Background worker in RagPlatform.Api
+        ↓
+Download PDF from staging
+        ↓
+PDF text extraction with PdfPig
+        ↓
+Delete temporary Blob after successful extraction
         ↓
 DocumentChunk generation
         ↓
@@ -908,17 +917,17 @@ Store DocumentEmbeddings in PostgreSQL/pgvector
 Import status = Completed
 ```
 
-The worker uses the document identifier to coordinate processing and updates the persisted import status on success or terminal failure. Service Bus decouples the upload request from long-running PDF and model operations, allowing imports to run in the background, transient failures to be retried, and worker capacity to be scaled independently. This is also an intentional learning objective for Azure Service Bus, background workers, event-driven architecture, retry handling, and long-running AI workflows.
+Import status is tracked as `Queued`, `Processing`, `Completed`, or `Failed`. The API publishes an import message after creating the queued document; the in-process worker consumes it and updates the document status. This MVP deliberately uses the existing `RagPlatform.Api` project and does not add a separate worker project or an outbox pattern.
 
-Because original PDFs are not retained and Service Bus messages should not carry document binaries, the upload flow requires a short-lived, access-controlled staging location that the worker can read. The staging copy is temporary transfer data, not the document store, and must be deleted after extraction (including through expiry/cleanup if processing fails). Only the extracted text and document metadata are retained by RagPlatform. The exact staging mechanism is an implementation decision to confirm before coding.
+Service Bus decouples the upload request from long-running PDF and model operations, so callers do not wait for extraction and embedding generation. Its use is also an intentional learning objective for Azure Service Bus, background processing, event-driven ingestion, and retry handling. The worker deletes the staging blob after successful text extraction. If an import fails before extraction completes, the blob may remain temporarily for retry; an Azure Blob lifecycle policy removes abandoned staging files. Extracted text and document metadata are stored by RagPlatform; the original PDF is not retained after successful extraction.
 
 ### Ownership boundaries
 
 - **RagPlatform** owns document records and extracted text, chunks, embeddings, PostgreSQL/pgvector storage, vector search, import status, and audit data.
 - **Azure Service Bus** transports import work notifications; it is not document or vector storage.
-- **Document Import Worker** extracts text, creates chunks, calls Foundry for embeddings, persists results in RagPlatform, and records the final status.
+- **The in-process document import worker** runs in `RagPlatform.Api`, extracts text, creates chunks, calls Foundry for embeddings, persists results in RagPlatform, and records the final status.
 - **Azure AI Foundry** provides embedding generation and chat/model inference only.
-- **Temporary PDF staging** exists only until extraction and is deleted afterward; it is not retained as a user-accessible document asset.
+- **Temporary Azure Blob staging** is not document storage. The worker deletes the blob after successful extraction; lifecycle cleanup handles abandoned staging files.
 
 ### Future Foundry capabilities
 
