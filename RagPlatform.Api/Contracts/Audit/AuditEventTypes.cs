@@ -13,6 +13,7 @@ public static class AuditEventTypes
     public const string DocumentImportMessagePublishFailed = "DocumentImportMessagePublishFailed";
     public const string DocumentImportExtractionSucceeded = "DocumentImportExtractionSucceeded";
     public const string DocumentImportPermanentPdfFailure = "DocumentImportPermanentPdfFailure";
+    public const string DocumentChunksGenerated = "DocumentChunksGenerated";
     public const string ConversationCreated = "ConversationCreated";
     public const string ConversationDeleted = "ConversationDeleted";
     public const string ConversationAccessDenied = "ConversationAccessDenied";

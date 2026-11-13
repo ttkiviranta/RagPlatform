@@ -814,7 +814,7 @@ The collection includes requests to create a conversation and add a user message
 
 ### 🚧 Knowledge Ingestion & Q&A
 
-Document Import & Knowledge Ingestion is the logical next phase: Phase 11 validated model inference and vector storage, but business documents still need a reliable, managed path from PDF upload and text extraction through chunking and embedding to a populated, searchable knowledge base. Tasks 1-6 now cover configuration, import metadata, PDF staging, post-commit Service Bus publishing, validated consumption, and idempotent PDF extraction with staging cleanup. Chunking, embedding, completion status, and end-to-end rollout validation remain pending. The worker is still disabled by default, and successful messages are intentionally left unsettled until downstream processing is complete.
+Document Import & Knowledge Ingestion extends the Phase 11 inference and vector-storage foundation with a managed path from PDF upload through extraction, chunking, and embedding. Tasks 1-7 now cover configuration, import metadata, PDF staging, post-commit Service Bus publishing, validated consumption, idempotent PDF extraction with staging cleanup, and transactional chunk generation. Embedding, completion status, and end-to-end rollout validation remain pending. The worker is still disabled by default, and successful messages are intentionally left unsettled until downstream processing is complete.
 
 - 🚧 Phase 12 - Document Import & Knowledge Ingestion
   - ✅ Task 1: Blob Storage and Service Bus configuration, options, and dependency injection
@@ -828,10 +828,16 @@ Document Import & Knowledge Ingestion is the logical next phase: Phase 11 valida
     - PdfPig 0.1.16 downloads by persisted `StagingBlobKey`, enforces the 25 MB limit, and verifies the downloaded size against `Document.FileSize`.
     - Encrypted, corrupt/unreadable, no-page, and no-text PDFs are classified as permanent failures; only these failures persist `Failed` with a permanent-failure audit event.
     - Extracted text, `UpdatedAt`, and the success audit event are persisted before staging-blob deletion. Cleanup failure is logged and measured; redelivery retries cleanup without repeating extraction. `StagingBlobKey` remains persisted.
-    - The settlement policy permits dead-lettering only after persisted `Failed` status and matching audit evidence. Transient failures remain retryable; successful extraction is deliberately left unsettled until chunking and embeddings are complete.
+    - The settlement policy permits dead-lettering only after persisted `Failed` status and matching audit evidence. Transient failures remain retryable; successful extraction is deliberately left unsettled until embeddings and final status handling are complete.
     - Validation: solution build succeeds. Tests are discoverable but cannot currently execute in this environment because Windows Application Control (Smart App Control/Code Integrity, error `0x800711C7`) blocks test execution; use an approved development VM or IT-approved policy for test runs.
-    - Rollout gate: keep the worker disabled until Tasks 7-9, end-to-end settlement/retry validation on an isolated test queue, and approved test execution are complete. Do not enable it against a shared or production-like queue.
-  - ⬜ Task 7: connect extracted text to the existing chunk-generation service
+    - Rollout gate: keep the worker disabled until Tasks 8-9, end-to-end settlement/retry validation on an isolated test queue, and approved test execution are complete. Do not enable it against a shared or production-like queue.
+  - ✅ Task 7: connect extracted text to the existing chunk-generation service
+    - The trusted import entry point accepts a validated persisted document, requires `ImportStatus = Processing` and persisted non-empty content, and does not depend on a current HTTP user. API chunk generation continues to use the same `DocumentChunkingService` algorithm.
+    - Chunk records use contiguous zero-based `ChunkIndex` values and a persisted `CharacterCount`. Redelivery validates and reuses a complete set; partial or inconsistent sets are rejected without automatic regeneration.
+    - PostgreSQL `SELECT ... FOR UPDATE` serializes each document's check-and-create sequence. The existing unique index on `(DocumentId, ChunkIndex)` is a final guard; a uniqueness conflict triggers a savepoint rollback and reuses the concurrently persisted set only after validation.
+    - Chunk records and the `DocumentChunksGenerated` audit event commit in one transaction. The event records chunk count and duration without chunk text, and redelivery does not duplicate it.
+    - `DocumentChunking` telemetry records duration, success/failure, generated chunk count, and reused chunk count without logging document or chunk content. `ImportStatus` remains `Processing`; Task 7 does not generate embeddings or settle messages.
+    - Validation: solution build succeeds. Test execution remains blocked in this environment by Windows Application Control (`0x800711C7`); run the tests in an approved development VM or under an IT-approved policy.
   - ⬜ Task 8: connect chunks to Foundry embeddings and PostgreSQL/pgvector persistence
   - ⬜ Task 9: complete import status transitions, status reporting, retries, and end-to-end validation
   - Existing document list/delete APIs are available; staging-aware deletion and abandoned-blob cleanup remain to be completed
@@ -921,7 +927,7 @@ Store DocumentEmbeddings in PostgreSQL/pgvector
 Import status = Completed
 ```
 
-Import status is tracked as `Queued`, `Processing`, `Completed`, or `Failed`. Tasks 1-6 implement the API publish foundation and opt-in worker path: message validation, PdfPig extraction, text persistence, audit/telemetry, permanent-failure classification, and post-persistence staging cleanup. The message includes `DocumentId`, `TenantId`, `OwnerUserId`, `StagingBlobKey`, and `CreatedAtUtc`. If publishing fails, the API logs and audits the failure, attempts to persist `Failed`, and returns a service-unavailable response. Chunking, embeddings, final status transitions, and completion settlement remain pending. This MVP deliberately uses the existing `RagPlatform.Api` project and does not add a separate worker project or an outbox pattern.
+Import status is tracked as `Queued`, `Processing`, `Completed`, or `Failed`. Tasks 1-7 implement the API publish foundation and opt-in worker path: message validation, PdfPig extraction, text persistence, audit/telemetry, permanent-failure classification, post-persistence staging cleanup, and trusted transactional chunk generation. The message includes `DocumentId`, `TenantId`, `OwnerUserId`, `StagingBlobKey`, and `CreatedAtUtc`. If publishing fails, the API logs and audits the failure, attempts to persist `Failed`, and returns a service-unavailable response. Embeddings, final status transitions, and completion settlement remain pending. This MVP deliberately uses the existing `RagPlatform.Api` project and does not add a separate worker project or an outbox pattern.
 
 Service Bus decouples the upload request from long-running PDF and model operations, so callers do not wait for extraction and embedding generation. Its use is also an intentional learning objective for Azure Service Bus, background processing, event-driven ingestion, and retry handling. The worker deletes the staging blob only after extracted text and its success audit event have been persisted successfully. A cleanup failure is measured and logged; redelivery retries cleanup without repeating extraction. Failed PDF imports retain their staging blob for diagnosis or retry policy, and an Azure Blob lifecycle policy can remove abandoned staging files. Extracted text and document metadata are stored by RagPlatform; the original PDF is not retained after successful extraction.
 
@@ -930,9 +936,9 @@ Service Bus decouples the upload request from long-running PDF and model operati
 - The `ServiceBusProcessor` remains configured with `AutoCompleteMessages = false`, `MaxConcurrentCalls = 1`, and `PrefetchCount = 0`.
 - A permanent PDF failure is eligible for dead-lettering only after the database confirms both `ImportStatus = Failed` and the matching permanent-failure audit event. If either is missing, the message remains unsettled and retryable.
 - Transient download, database, cancellation, and unexpected failures do not set `Failed`; they remain unsettled for retry. The worker does not abandon them explicitly.
-- Successful extraction does not call `CompleteMessageAsync`. Settlement is deferred until chunk generation, embedding persistence, final status transitions, and end-to-end retry behavior are implemented and validated.
+- Successful extraction and chunk generation do not call `CompleteMessageAsync`. Settlement is deferred until embedding persistence, final status transitions, and end-to-end retry behavior are implemented and validated.
 - Because successful messages remain unsettled, the broker can redeliver them after lock expiry and eventually exhaust the delivery count. This is an intentional temporary gate, not a production-ready completion strategy.
-- Keep `ServiceBus:DocumentImportWorkerEnabled` set to `false`. Do not enable the worker against a production-like or shared queue; rollout requires an isolated test queue, validated chunk/embedding persistence, and an explicit end-to-end settlement/retry review.
+- Keep `ServiceBus:DocumentImportWorkerEnabled` set to `false`. Do not enable the worker against a production-like or shared queue; rollout requires Task 8-9 completion, an isolated test queue, validated chunk/embedding persistence, approved test execution, and an explicit end-to-end settlement/retry review.
 
 ### Ownership boundaries
 

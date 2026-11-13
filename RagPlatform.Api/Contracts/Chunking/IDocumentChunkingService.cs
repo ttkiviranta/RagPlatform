@@ -10,6 +10,12 @@ public interface IDocumentChunkingService
         int chunkOverlap,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<DocumentChunk>> GenerateChunksForImportAsync(
+        Document validatedDocument,
+        int chunkSize,
+        int chunkOverlap,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<DocumentChunk>> GetChunksForDocumentAsync(
         Guid documentId,
         CancellationToken cancellationToken = default);

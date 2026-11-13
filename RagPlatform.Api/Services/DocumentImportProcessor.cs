@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using RagPlatform.Api.Contracts.Audit;
+using RagPlatform.Api.Contracts.Chunking;
 using RagPlatform.Api.Contracts.Documents;
 using RagPlatform.Api.Contracts.Processing;
 using RagPlatform.Api.Contracts.Telemetry;
@@ -17,6 +18,7 @@ public sealed class DocumentImportProcessor
     private readonly ApplicationDbContext _dbContext;
     private readonly IStagingBlobStore _stagingBlobStore;
     private readonly IPdfTextExtractor _pdfTextExtractor;
+    private readonly IDocumentChunkingService _documentChunkingService;
     private readonly IAuditEventWriter _auditEventWriter;
     private readonly ITelemetryService _telemetryService;
     private readonly ILogger<DocumentImportProcessor> _logger;
@@ -25,6 +27,7 @@ public sealed class DocumentImportProcessor
         ApplicationDbContext dbContext,
         IStagingBlobStore stagingBlobStore,
         IPdfTextExtractor pdfTextExtractor,
+        IDocumentChunkingService documentChunkingService,
         IAuditEventWriter auditEventWriter,
         ITelemetryService telemetryService,
         ILogger<DocumentImportProcessor> logger)
@@ -32,6 +35,7 @@ public sealed class DocumentImportProcessor
         _dbContext = dbContext;
         _stagingBlobStore = stagingBlobStore;
         _pdfTextExtractor = pdfTextExtractor;
+        _documentChunkingService = documentChunkingService;
         _auditEventWriter = auditEventWriter;
         _telemetryService = telemetryService;
         _logger = logger;
@@ -81,6 +85,7 @@ public sealed class DocumentImportProcessor
             }
 
             await DeleteStagingBlobAsync(document, cancellationToken);
+            await GenerateChunksAsync(document, cancellationToken);
             return;
         }
 
@@ -160,6 +165,34 @@ public sealed class DocumentImportProcessor
                 extractionResult.PageCount);
 
             await DeleteStagingBlobAsync(document, cancellationToken);
+            await GenerateChunksAsync(document, cancellationToken);
+        }
+    }
+
+    private async Task GenerateChunksAsync(Document document, CancellationToken cancellationToken)
+    {
+        var chunkRequest = new DocumentChunkRequest();
+        var chunks = await _documentChunkingService.GenerateChunksForImportAsync(
+            document,
+            chunkRequest.ChunkSize,
+            chunkRequest.ChunkOverlap,
+            cancellationToken);
+
+        if (chunks.Count == 0)
+        {
+            throw new InvalidOperationException($"Chunking produced no chunks for document {document.Id}.");
+        }
+
+        for (var index = 0; index < chunks.Count; index++)
+        {
+            var chunk = chunks[index];
+            if (chunk.ChunkIndex != index
+                || string.IsNullOrWhiteSpace(chunk.Content)
+                || chunk.CharacterCount != chunk.Content.Length)
+            {
+                throw new InvalidDataException(
+                    $"Chunking returned an invalid chunk set for document {document.Id}.");
+            }
         }
     }
 

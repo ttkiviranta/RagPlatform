@@ -8,6 +8,8 @@ public interface ITelemetryService
 
     void TrackDocumentProcessing(string operation, double durationMs, bool success, int itemCount = 0);
 
+    void TrackDocumentChunking(double durationMs, bool success, int generatedChunkCount, int reusedChunkCount);
+
     void TrackEmbeddingGeneration(string modelName, double durationMs, int vectorDimensions, bool success);
 
     void TrackVectorSearch(string modelName, int topK, int resultCount, double averageSimilarity, double durationMs, bool success);

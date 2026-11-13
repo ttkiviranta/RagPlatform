@@ -60,6 +60,19 @@ public sealed class ApplicationInsightsTelemetryService : ITelemetryService
         _telemetryClient.TrackMetric("ItemCount", itemCount, properties);
     }
 
+    public void TrackDocumentChunking(double durationMs, bool success, int generatedChunkCount, int reusedChunkCount)
+    {
+        var properties = new Dictionary<string, string>
+        {
+            ["Success"] = success.ToString()
+        };
+
+        _telemetryClient.TrackEvent("DocumentChunking", properties);
+        _telemetryClient.TrackMetric("DocumentChunkingDurationMs", durationMs, properties);
+        _telemetryClient.TrackMetric("GeneratedChunkCount", generatedChunkCount, properties);
+        _telemetryClient.TrackMetric("ReusedChunkCount", reusedChunkCount, properties);
+    }
+
     public void TrackEmbeddingGeneration(string modelName, double durationMs, int vectorDimensions, bool success)
     {
         var properties = new Dictionary<string, string>

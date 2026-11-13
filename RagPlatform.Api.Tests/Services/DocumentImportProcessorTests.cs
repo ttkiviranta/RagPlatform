@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using RagPlatform.Api.Contracts.Audit;
+using RagPlatform.Api.Contracts.Chunking;
 using RagPlatform.Api.Contracts.Documents;
 using RagPlatform.Api.Contracts.Processing;
 using RagPlatform.Api.Contracts.Telemetry;
@@ -24,7 +25,8 @@ public sealed class DocumentImportProcessorTests
         var blobStore = new FakeStagingBlobStore();
         var extractor = new FakePdfTextExtractor(new PdfTextExtractionResult("Extracted PDF text", 2));
         var telemetry = new FakeTelemetryService();
-        var processor = CreateProcessor(dbContext, blobStore, extractor, telemetry);
+        var chunkingService = new FakeDocumentChunkingService();
+        var processor = CreateProcessor(dbContext, blobStore, extractor, telemetry, chunkingService);
         var originalUpdatedAt = document.UpdatedAt;
 
         await processor.ProcessAsync(document);
@@ -37,6 +39,9 @@ public sealed class DocumentImportProcessorTests
         Assert.AreEqual(updatedAt, document.UpdatedAt);
         Assert.AreEqual(1, blobStore.DownloadCount);
         Assert.AreEqual(1, extractor.ExtractionCount);
+        Assert.AreEqual(2, chunkingService.ImportChunkingCallCount);
+        Assert.AreEqual(1000, chunkingService.LastChunkSize);
+        Assert.AreEqual(150, chunkingService.LastChunkOverlap);
         var successAudit = await dbContext.AuditEvents.SingleAsync();
         Assert.AreEqual(AuditEventTypes.DocumentImportExtractionSucceeded, successAudit.EventType);
         Assert.AreEqual("Succeeded", successAudit.Outcome);
@@ -98,7 +103,8 @@ public sealed class DocumentImportProcessorTests
         var blobStore = new FakeStagingBlobStore();
         var extractor = new FakePdfTextExtractor(new PdfTextExtractionResult("Unused", 1));
         var telemetry = new FakeTelemetryService();
-        var processor = CreateProcessor(dbContext, blobStore, extractor, telemetry);
+        var chunkingService = new FakeDocumentChunkingService();
+        var processor = CreateProcessor(dbContext, blobStore, extractor, telemetry, chunkingService);
 
         await processor.ProcessAsync(document);
 
@@ -107,6 +113,7 @@ public sealed class DocumentImportProcessorTests
         Assert.AreEqual(0, extractor.ExtractionCount);
         Assert.AreEqual(1, blobStore.DeleteCount);
         Assert.AreEqual("StagingBlobCleanup", telemetry.Events[0].Operation);
+        Assert.AreEqual(1, chunkingService.ImportChunkingCallCount);
     }
 
     [TestMethod]
@@ -153,6 +160,42 @@ public sealed class DocumentImportProcessorTests
         Assert.AreEqual("Failed", failureAudit.Outcome);
         Assert.AreEqual(2, telemetry.Events.Count);
         Assert.IsFalse(telemetry.Events[1].Success);
+    }
+
+    [TestMethod]
+    public async Task ProcessAsync_WhenChunkingReturnsNoChunks_RejectsWithoutChangingStatus()
+    {
+        using var dbContext = CreateDbContext();
+        var document = CreateDocument();
+        document.Content = "Persisted text";
+        await dbContext.Documents.AddAsync(document);
+        dbContext.AuditEvents.Add(new AuditEvent
+        {
+            TenantId = document.TenantId,
+            ActorUserId = document.OwnerUserId,
+            EventType = AuditEventTypes.DocumentImportExtractionSucceeded,
+            Outcome = "Succeeded",
+            TargetType = "Document",
+            TargetId = document.Id.ToString()
+        });
+        await dbContext.SaveChangesAsync();
+        var blobStore = new FakeStagingBlobStore();
+        var extractor = new FakePdfTextExtractor(new PdfTextExtractionResult("Unused", 1));
+        var chunkingService = new FakeDocumentChunkingService([]);
+        var processor = CreateProcessor(
+            dbContext,
+            blobStore,
+            extractor,
+            new FakeTelemetryService(),
+            chunkingService);
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => processor.ProcessAsync(document));
+
+        Assert.AreEqual(DocumentImportStatus.Processing, document.ImportStatus);
+        Assert.AreEqual(0, blobStore.DownloadCount);
+        Assert.AreEqual(0, extractor.ExtractionCount);
+        Assert.AreEqual(1, chunkingService.ImportChunkingCallCount);
+        Assert.AreEqual(0, await dbContext.DocumentChunks.CountAsync());
     }
 
     [TestMethod]
@@ -261,12 +304,14 @@ public sealed class DocumentImportProcessorTests
         ApplicationDbContext dbContext,
         FakeStagingBlobStore blobStore,
         FakePdfTextExtractor extractor,
-        FakeTelemetryService telemetry)
+        FakeTelemetryService telemetry,
+        FakeDocumentChunkingService? chunkingService = null)
     {
         return new DocumentImportProcessor(
             dbContext,
             blobStore,
             extractor,
+            chunkingService ?? new FakeDocumentChunkingService(),
             new AuditEventWriter(dbContext, new HttpContextAccessor()),
             telemetry,
             NullLogger<DocumentImportProcessor>.Instance);
@@ -355,6 +400,65 @@ public sealed class DocumentImportProcessorTests
         }
     }
 
+    private sealed class FakeDocumentChunkingService : IDocumentChunkingService
+    {
+        private readonly IReadOnlyList<DocumentChunk>? _chunks;
+
+        public FakeDocumentChunkingService(IReadOnlyList<DocumentChunk>? chunks = null)
+        {
+            _chunks = chunks;
+        }
+
+        public int ImportChunkingCallCount { get; private set; }
+
+        public int LastChunkSize { get; private set; }
+
+        public int LastChunkOverlap { get; private set; }
+
+        public Task<IReadOnlyList<DocumentChunk>> GenerateChunksForImportAsync(
+            Document validatedDocument,
+            int chunkSize,
+            int chunkOverlap,
+            CancellationToken cancellationToken = default)
+        {
+            ImportChunkingCallCount++;
+            LastChunkSize = chunkSize;
+            LastChunkOverlap = chunkOverlap;
+            IReadOnlyList<DocumentChunk> chunks = _chunks ??
+            [
+                new DocumentChunk
+                {
+                    DocumentId = validatedDocument.Id,
+                    ChunkIndex = 0,
+                    Content = "Generated chunk",
+                    CharacterCount = "Generated chunk".Length
+                }
+            ];
+            return Task.FromResult(chunks);
+        }
+
+        public Task<IReadOnlyList<DocumentChunk>> GenerateChunksAsync(
+            Guid documentId,
+            int chunkSize,
+            int chunkOverlap,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<IReadOnlyList<DocumentChunk>> GetChunksForDocumentAsync(
+            Guid documentId,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<DocumentChunk?> GetByIdAsync(Guid chunkId, CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
     private sealed class FakeTelemetryService : ITelemetryService
     {
         public List<DocumentProcessingEvent> Events { get; } = [];
@@ -370,6 +474,10 @@ public sealed class DocumentImportProcessorTests
         public void TrackDocumentProcessing(string operation, double durationMs, bool success, int itemCount = 0)
         {
             Events.Add(new DocumentProcessingEvent(operation, durationMs, success, itemCount));
+        }
+
+        public void TrackDocumentChunking(double durationMs, bool success, int generatedChunkCount, int reusedChunkCount)
+        {
         }
 
         public void TrackEmbeddingGeneration(string modelName, double durationMs, int vectorDimensions, bool success)
