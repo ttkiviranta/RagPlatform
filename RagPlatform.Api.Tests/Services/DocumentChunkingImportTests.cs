@@ -267,7 +267,9 @@ public sealed class DocumentChunkingImportTests
             string? modelDeployment = null,
             string? modelOperation = null,
             int? inputTokenCount = null,
-            int? outputTokenCount = null)
+            int? outputTokenCount = null,
+            int? generatedEmbeddingCount = null,
+            int? reusedEmbeddingCount = null)
         {
             dbContext.AuditEvents.Add(new AuditEvent
             {
@@ -312,6 +314,13 @@ public sealed class DocumentChunkingImportTests
         public void TrackDocumentProcessing(string operation, double durationMs, bool success, int itemCount = 0) { }
 
         public void TrackEmbeddingGeneration(string modelName, double durationMs, int vectorDimensions, bool success) { }
+
+        public void TrackEmbeddingBatch(
+            string modelName,
+            double durationMs,
+            bool success,
+            int generatedEmbeddingCount,
+            int reusedEmbeddingCount) { }
 
         public void TrackVectorSearch(
             string modelName,

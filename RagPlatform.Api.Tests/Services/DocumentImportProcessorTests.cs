@@ -484,6 +484,15 @@ public sealed class DocumentImportProcessorTests
         {
         }
 
+        public void TrackEmbeddingBatch(
+            string modelName,
+            double durationMs,
+            bool success,
+            int generatedEmbeddingCount,
+            int reusedEmbeddingCount)
+        {
+        }
+
         public void TrackVectorSearch(
             string modelName,
             int topK,

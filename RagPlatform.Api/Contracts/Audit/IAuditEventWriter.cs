@@ -20,7 +20,9 @@ public interface IAuditEventWriter
         string? modelDeployment = null,
         string? modelOperation = null,
         int? inputTokenCount = null,
-        int? outputTokenCount = null);
+        int? outputTokenCount = null,
+        int? generatedEmbeddingCount = null,
+        int? reusedEmbeddingCount = null);
 
     Task FlushAsync(CancellationToken cancellationToken = default);
 }

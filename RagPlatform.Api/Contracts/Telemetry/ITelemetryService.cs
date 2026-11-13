@@ -12,6 +12,13 @@ public interface ITelemetryService
 
     void TrackEmbeddingGeneration(string modelName, double durationMs, int vectorDimensions, bool success);
 
+    void TrackEmbeddingBatch(
+        string modelName,
+        double durationMs,
+        bool success,
+        int generatedEmbeddingCount,
+        int reusedEmbeddingCount);
+
     void TrackVectorSearch(string modelName, int topK, int resultCount, double averageSimilarity, double durationMs, bool success);
 
     void TrackRagQuery(int inputCharacterCount, int topK, int retrievedChunkCount, int contextLength, int promptLength, double durationMs, bool success);

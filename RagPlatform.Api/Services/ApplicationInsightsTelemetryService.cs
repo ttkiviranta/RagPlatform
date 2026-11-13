@@ -86,6 +86,25 @@ public sealed class ApplicationInsightsTelemetryService : ITelemetryService
         _telemetryClient.TrackMetric("VectorDimensions", vectorDimensions, properties);
     }
 
+    public void TrackEmbeddingBatch(
+        string modelName,
+        double durationMs,
+        bool success,
+        int generatedEmbeddingCount,
+        int reusedEmbeddingCount)
+    {
+        var properties = new Dictionary<string, string>
+        {
+            ["ModelName"] = modelName,
+            ["Success"] = success.ToString()
+        };
+
+        _telemetryClient.TrackEvent("EmbeddingBatch", properties);
+        _telemetryClient.TrackMetric("EmbeddingBatchDurationMs", durationMs, properties);
+        _telemetryClient.TrackMetric("GeneratedEmbeddingCount", generatedEmbeddingCount, properties);
+        _telemetryClient.TrackMetric("ReusedEmbeddingCount", reusedEmbeddingCount, properties);
+    }
+
     public void TrackVectorSearch(string modelName, int topK, int resultCount, double averageSimilarity, double durationMs, bool success)
     {
         var properties = new Dictionary<string, string>

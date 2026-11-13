@@ -47,4 +47,8 @@ public sealed class AuditEvent
     public int? InputTokenCount { get; set; }
 
     public int? OutputTokenCount { get; set; }
+
+    public int? GeneratedEmbeddingCount { get; set; }
+
+    public int? ReusedEmbeddingCount { get; set; }
 }

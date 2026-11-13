@@ -46,6 +46,9 @@ namespace RagPlatform.Api.Data.Migrations
                     b.Property<double?>("DurationMilliseconds")
                         .HasColumnType("double precision");
 
+                    b.Property<int?>("GeneratedEmbeddingCount")
+                        .HasColumnType("integer");
+
                     b.Property<string>("EventType")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -97,6 +100,9 @@ namespace RagPlatform.Api.Data.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int?>("ResultCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ReusedEmbeddingCount")
                         .HasColumnType("integer");
 
                     b.Property<string>("TargetId")

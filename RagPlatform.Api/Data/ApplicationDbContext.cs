@@ -288,6 +288,8 @@ public sealed class ApplicationDbContext : DbContext
                 .HasMaxLength(100);
             entity.Property(auditEvent => auditEvent.InputTokenCount);
             entity.Property(auditEvent => auditEvent.OutputTokenCount);
+            entity.Property(auditEvent => auditEvent.GeneratedEmbeddingCount);
+            entity.Property(auditEvent => auditEvent.ReusedEmbeddingCount);
             entity.HasIndex(auditEvent => new { auditEvent.TenantId, auditEvent.OccurredAtUtc });
             entity.HasIndex(auditEvent => new
             {

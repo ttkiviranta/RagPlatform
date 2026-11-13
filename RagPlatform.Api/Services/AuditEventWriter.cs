@@ -36,7 +36,9 @@ public sealed class AuditEventWriter : IAuditEventWriter
         string? modelDeployment = null,
         string? modelOperation = null,
         int? inputTokenCount = null,
-        int? outputTokenCount = null)
+        int? outputTokenCount = null,
+        int? generatedEmbeddingCount = null,
+        int? reusedEmbeddingCount = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
         ArgumentException.ThrowIfNullOrWhiteSpace(eventType);
@@ -66,7 +68,9 @@ public sealed class AuditEventWriter : IAuditEventWriter
             ModelDeployment = modelDeployment,
             ModelOperation = modelOperation,
             InputTokenCount = inputTokenCount,
-            OutputTokenCount = outputTokenCount
+            OutputTokenCount = outputTokenCount,
+            GeneratedEmbeddingCount = generatedEmbeddingCount,
+            ReusedEmbeddingCount = reusedEmbeddingCount
         });
     }
 
