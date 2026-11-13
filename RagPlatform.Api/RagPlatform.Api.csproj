@@ -28,6 +28,7 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.20.1" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.20.1" />
     <PackageReference Include="OpenTelemetry.Instrumentation.SqlClient" Version="1.20.1" />
+    <PackageReference Include="PdfPig" Version="0.1.16" />
     <PackageReference Include="Pgvector" Version="0.3.2" />
     <PackageReference Include="Pgvector.EntityFrameworkCore" Version="0.3.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.3" />

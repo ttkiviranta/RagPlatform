@@ -276,6 +276,7 @@ builder.Services.AddScoped<IConversationService, ConversationService>();
 builder.Services.AddScoped<IConversationMessageService, ConversationMessageService>();
 builder.Services.AddScoped<IPlainTextProcessor, PlainTextProcessor>();
 builder.Services.AddScoped<IMarkdownProcessor, MarkdownProcessor>();
+builder.Services.AddScoped<IPdfTextExtractor, PdfPigTextExtractor>();
 builder.Services.AddScoped<IWebContentService, WebContentService>();
 builder.Services.AddScoped<IDocumentChunkingService, DocumentChunkingService>();
 builder.Services.AddScoped<IEmbeddingProvider, FoundryEmbeddingProvider>();
@@ -289,6 +290,9 @@ builder.Services.AddScoped<ITelemetryService, ApplicationInsightsTelemetryServic
 builder.Services.AddScoped<IUserBootstrapService, UserBootstrapService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IDocumentAccessService, DocumentAccessService>();
+builder.Services.AddScoped<IStagingBlobStore, AzureStagingBlobStore>();
+builder.Services.AddScoped<DocumentImportProcessor>();
+builder.Services.AddScoped<IDocumentImportSettlementPolicy, DocumentImportSettlementPolicy>();
 builder.Services.AddScoped<DocumentImportService>();
 builder.Services.AddScoped<DocumentImportMessageHandler>();
 builder.Services.AddScoped<DocumentProcessingService>();
@@ -310,3 +314,5 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program { }

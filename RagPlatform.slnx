@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="RagPlatform.Api.Tests/RagPlatform.Api.Tests.csproj" />
   <Project Path="RagPlatform.Api/RagPlatform.Api.csproj" />
 </Solution>
