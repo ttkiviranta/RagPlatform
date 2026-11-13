@@ -14,6 +14,8 @@ public sealed class ServiceBusOptions : IValidatableObject
     [RegularExpression("^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,258}[A-Za-z0-9])?$")]
     public string ImportQueueName { get; set; } = "document-import";
 
+    public bool DocumentImportWorkerEnabled { get; set; } = false;
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (string.IsNullOrWhiteSpace(FullyQualifiedNamespace)

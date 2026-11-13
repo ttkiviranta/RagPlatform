@@ -46,6 +46,13 @@ builder.Services.AddOptions<BlobStorageOptions>()
 builder.Services.AddOptions<ServiceBusOptions>()
     .Bind(builder.Configuration.GetSection(ServiceBusOptions.SectionName))
     .ValidateDataAnnotations();
+var documentImportWorkerEnabled = builder.Configuration.GetValue<bool>(
+    $"{ServiceBusOptions.SectionName}:{nameof(ServiceBusOptions.DocumentImportWorkerEnabled)}");
+if (documentImportWorkerEnabled)
+{
+    builder.Services.AddHostedService<DocumentImportBackgroundService>();
+}
+
 builder.Services.AddSingleton<BlobServiceClient>(serviceProvider =>
 {
     var options = serviceProvider.GetRequiredService<IOptions<BlobStorageOptions>>().Value;
@@ -283,6 +290,7 @@ builder.Services.AddScoped<IUserBootstrapService, UserBootstrapService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IDocumentAccessService, DocumentAccessService>();
 builder.Services.AddScoped<DocumentImportService>();
+builder.Services.AddScoped<DocumentImportMessageHandler>();
 builder.Services.AddScoped<DocumentProcessingService>();
 
 var app = builder.Build();

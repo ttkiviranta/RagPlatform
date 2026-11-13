@@ -9,6 +9,7 @@ public static class AuditEventTypes
     public const string DocumentUpdated = "DocumentUpdated";
     public const string DocumentDeleted = "DocumentDeleted";
     public const string DocumentAccessDenied = "DocumentAccessDenied";
+    public const string DocumentImportStarted = "DocumentImportStarted";
     public const string DocumentImportMessagePublishFailed = "DocumentImportMessagePublishFailed";
     public const string ConversationCreated = "ConversationCreated";
     public const string ConversationDeleted = "ConversationDeleted";
