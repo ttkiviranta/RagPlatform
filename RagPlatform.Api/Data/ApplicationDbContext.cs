@@ -56,6 +56,13 @@ public sealed class ApplicationDbContext : DbContext
                 .HasDefaultValue(string.Empty);
             entity.Property(document => document.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(document => document.UpdatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(document => document.ImportStatus)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+            entity.Property(document => document.StagingBlobKey)
+                .HasMaxLength(1024);
             entity.Property(document => document.TenantId)
                 .IsRequired()
                 .HasMaxLength(255);

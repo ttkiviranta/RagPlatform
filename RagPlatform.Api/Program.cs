@@ -4,10 +4,14 @@ using Microsoft.ApplicationInsights.Extensibility;
 using System.Security.Claims;
 using Azure.Core;
 using Azure.Identity;
+using Azure.Messaging.ServiceBus;
+using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Options;
+using Microsoft.OpenApi.Models;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -30,11 +34,36 @@ using RagPlatform.Api.Data;
 using RagPlatform.Api.Options;
 using RagPlatform.Api.Providers;
 using RagPlatform.Api.Services;
+using RagPlatform.Api.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<FoundryOptions>(
     builder.Configuration.GetSection(FoundryOptions.SectionName));
 builder.Services.AddSingleton<TokenCredential>(_ => new DefaultAzureCredential());
+builder.Services.AddOptions<BlobStorageOptions>()
+    .Bind(builder.Configuration.GetSection(BlobStorageOptions.SectionName))
+    .ValidateDataAnnotations();
+builder.Services.AddOptions<ServiceBusOptions>()
+    .Bind(builder.Configuration.GetSection(ServiceBusOptions.SectionName))
+    .ValidateDataAnnotations();
+builder.Services.AddSingleton<BlobServiceClient>(serviceProvider =>
+{
+    var options = serviceProvider.GetRequiredService<IOptions<BlobStorageOptions>>().Value;
+    var credential = serviceProvider.GetRequiredService<TokenCredential>();
+    return new BlobServiceClient(new Uri(options.ServiceUri), credential);
+});
+builder.Services.AddSingleton<ServiceBusClient>(serviceProvider =>
+{
+    var options = serviceProvider.GetRequiredService<IOptions<ServiceBusOptions>>().Value;
+    var credential = serviceProvider.GetRequiredService<TokenCredential>();
+    return new ServiceBusClient(options.FullyQualifiedNamespace, credential);
+});
+builder.Services.AddSingleton<ServiceBusSender>(serviceProvider =>
+{
+    var options = serviceProvider.GetRequiredService<IOptions<ServiceBusOptions>>().Value;
+    return serviceProvider.GetRequiredService<ServiceBusClient>().CreateSender(options.ImportQueueName);
+});
+builder.Services.AddSingleton<IDocumentImportMessagePublisher, ServiceBusDocumentImportMessagePublisher>();
 builder.Services.AddHttpClient("FoundryInference", client =>
 {
     client.Timeout = TimeSpan.FromSeconds(60);
@@ -151,6 +180,30 @@ builder.Services.AddHttpClient("WebContentClient", client =>
 });
 builder.Services.AddSwaggerGen(options =>
 {
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "Paste a Microsoft Entra ID JWT access token. Swagger UI sends it as an Authorization: Bearer header.",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT"
+    });
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
 
@@ -158,6 +211,8 @@ builder.Services.AddSwaggerGen(options =>
     {
         options.IncludeXmlComments(xmlPath);
     }
+
+    options.OperationFilter<DocumentPdfUploadOperationFilter>();
 });
 
 builder.Services.AddOpenTelemetry()
@@ -227,6 +282,7 @@ builder.Services.AddScoped<ITelemetryService, ApplicationInsightsTelemetryServic
 builder.Services.AddScoped<IUserBootstrapService, UserBootstrapService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IDocumentAccessService, DocumentAccessService>();
+builder.Services.AddScoped<DocumentImportService>();
 builder.Services.AddScoped<DocumentProcessingService>();
 
 var app = builder.Build();

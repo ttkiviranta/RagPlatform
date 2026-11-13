@@ -814,25 +814,23 @@ The collection includes requests to create a conversation and add a user message
 
 ### 🚧 Knowledge Ingestion & Q&A
 
-Document Import & Knowledge Ingestion is the logical next phase: Phase 11 validated model inference and vector storage, but business documents still need a reliable, managed path from PDF upload and text extraction through chunking and embedding to a populated, searchable knowledge base. Document list and delete operations belong in this phase because they provide users the lifecycle controls needed to manage the knowledge they import, including cleanup of derived chunks and vectors. Phase 12 uses Azure Service Bus and a background worker to process long-running imports asynchronously, build event-driven architecture experience, and support retry handling. Document Q&A and Copilot integration depend on that dependable content pipeline.
+Document Import & Knowledge Ingestion is the logical next phase: Phase 11 validated model inference and vector storage, but business documents still need a reliable, managed path from PDF upload and text extraction through chunking and embedding to a populated, searchable knowledge base. Tasks 1-4 now cover the configuration, import metadata, PDF staging, and post-commit Service Bus publishing foundations. The in-process worker and downstream extraction, chunking, and embedding steps remain pending. Document list and delete operations belong in this phase because they provide users the lifecycle controls needed to manage imported knowledge, including cleanup of derived chunks and vectors. Document Q&A and Copilot integration depend on that complete content pipeline.
 
-- ⬜ Phase 12 - Document Import & Knowledge Ingestion
-  - Upload PDF documents
-  - Extract text from PDFs
-  - Create and persist document records
-  - Generate document chunks
-  - Generate embeddings using Azure AI Foundry
-  - Store embeddings in PostgreSQL/pgvector
-  - List imported documents
-  - Delete imported documents and their document, chunk, and embedding records
-  - Report import status
-  - Populate the searchable knowledge base
+- 🚧 Phase 12 - Document Import & Knowledge Ingestion
+  - ✅ Task 1: Blob Storage and Service Bus configuration, options, and dependency injection
+  - ✅ Task 2: document import fields, EF Core mappings, migration, and model consistency
+  - ✅ Task 3: PDF validation, private Blob staging, and queued Document creation
+  - ✅ Task 4: publish a typed Service Bus import message after the document transaction commits
+    - Validation: Blob Storage configuration completed; Service Bus configuration completed; PDF upload validation passed; Phase 12 migration applied; Service Bus message published successfully.
+    - Evidence: `documentId` `53bb6d68-427e-4806-a39e-ad1d46a50710`; `document-import` active messages = `1`.
+  - ⬜ Task 5: consume import messages with an in-process `BackgroundService` and `ServiceBusProcessor`
+  - ⬜ Task 6: extract PDF text with PdfPig and delete staging blobs after successful extraction
+  - ⬜ Task 7: connect extracted text to the existing chunk-generation service
+  - ⬜ Task 8: connect chunks to Foundry embeddings and PostgreSQL/pgvector persistence
+  - ⬜ Task 9: complete import status transitions, status reporting, retries, and end-to-end validation
+  - Existing document list/delete APIs are available; staging-aware deletion and abandoned-blob cleanup remain to be completed
   - Require each imported document to include `DocumentId`, `Title`, `FileName`, `CreatedAt`, `UpdatedAt`, and `OwnerUserId`
-  - Stage uploads temporarily in Azure Blob Storage and publish import work to Azure Service Bus
-  - Process messages using a `BackgroundService` and `ServiceBusProcessor` hosted in `RagPlatform.Api`
-  - Extract PDF text with PdfPig; delete the staging blob after successful extraction
-  - Retry transient processing failures and report terminal import status
-  - Do not retain original PDF files after successful extraction; allow temporary retention for retries and clean up abandoned blobs through a lifecycle policy
+  - Do not retain original PDFs as document assets; use Blob Storage only for temporary staging
   - Keep the existing solution structure: no dedicated worker project, outbox pattern, or major project split in this MVP
   - Defer OCR, SharePoint/OneDrive import, URL crawling, web crawler ingestion, document versioning, and automatic document refresh
 - ⬜ Phase 13 - Document Q&A
@@ -917,7 +915,7 @@ Store DocumentEmbeddings in PostgreSQL/pgvector
 Import status = Completed
 ```
 
-Import status is tracked as `Queued`, `Processing`, `Completed`, or `Failed`. The API publishes an import message after creating the queued document; the in-process worker consumes it and updates the document status. This MVP deliberately uses the existing `RagPlatform.Api` project and does not add a separate worker project or an outbox pattern.
+Import status is tracked as `Queued`, `Processing`, `Completed`, or `Failed`. Tasks 1-4 are implemented: the API publishes a typed import message only after the queued document and audit event have been committed. The message includes `DocumentId`, `TenantId`, `OwnerUserId`, `StagingBlobKey`, and `CreatedAtUtc`. If publishing fails, the API logs and audits the failure, attempts to persist `Failed`, and returns a service-unavailable response. The in-process worker and subsequent status transitions are still pending. This MVP deliberately uses the existing `RagPlatform.Api` project and does not add a separate worker project or an outbox pattern.
 
 Service Bus decouples the upload request from long-running PDF and model operations, so callers do not wait for extraction and embedding generation. Its use is also an intentional learning objective for Azure Service Bus, background processing, event-driven ingestion, and retry handling. The worker deletes the staging blob after successful text extraction. If an import fails before extraction completes, the blob may remain temporarily for retry; an Azure Blob lifecycle policy removes abandoned staging files. Extracted text and document metadata are stored by RagPlatform; the original PDF is not retained after successful extraction.
 

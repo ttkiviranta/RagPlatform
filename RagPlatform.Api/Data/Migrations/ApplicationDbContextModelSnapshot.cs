@@ -215,6 +215,10 @@ namespace RagPlatform.Api.Data.Migrations
                     b.Property<long>("FileSize")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("ImportStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<Guid?>("OwnerUserId")
                         .HasColumnType("uuid");
 
@@ -225,6 +229,10 @@ namespace RagPlatform.Api.Data.Migrations
                         .HasColumnType("character varying(2048)")
                         .HasDefaultValue("");
 
+                    b.Property<string>("StagingBlobKey")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
                     b.Property<string>("TenantId")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -234,6 +242,11 @@ namespace RagPlatform.Api.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.HasKey("Id");
 

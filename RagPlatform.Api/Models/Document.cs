@@ -20,6 +20,13 @@ public sealed class Document
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    public DocumentImportStatus? ImportStatus { get; set; }
+
+    [JsonIgnore]
+    public string? StagingBlobKey { get; set; }
+
     public Guid? OwnerUserId { get; set; }
 
     [JsonIgnore]
