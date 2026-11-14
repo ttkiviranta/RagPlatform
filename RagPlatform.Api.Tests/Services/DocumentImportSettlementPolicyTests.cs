@@ -25,6 +25,43 @@ public sealed class DocumentImportSettlementPolicyTests
     }
 
     [TestMethod]
+    public async Task DecideAsync_WhenCompletedStateAndAuditArePersisted_ReturnsComplete()
+    {
+        using var dbContext = CreateDbContext();
+        var document = CreateDocument(DocumentImportStatus.Completed);
+        await dbContext.Documents.AddAsync(document);
+        dbContext.AuditEvents.Add(new AuditEvent
+        {
+            TenantId = document.TenantId,
+            ActorUserId = document.OwnerUserId,
+            EventType = AuditEventTypes.DocumentImportCompleted,
+            Outcome = "Succeeded",
+            TargetType = "Document",
+            TargetId = document.Id.ToString()
+        });
+        await dbContext.SaveChangesAsync();
+        var policy = new DocumentImportSettlementPolicy(dbContext);
+
+        var disposition = await policy.DecideAsync(document, null);
+
+        Assert.AreEqual(DocumentImportSettlementDisposition.Complete, disposition);
+    }
+
+    [TestMethod]
+    public async Task DecideAsync_WhenCompletedStateHasNoCompletionAudit_DefersSettlement()
+    {
+        using var dbContext = CreateDbContext();
+        var document = CreateDocument(DocumentImportStatus.Completed);
+        await dbContext.Documents.AddAsync(document);
+        await dbContext.SaveChangesAsync();
+        var policy = new DocumentImportSettlementPolicy(dbContext);
+
+        var disposition = await policy.DecideAsync(document, null);
+
+        Assert.AreEqual(DocumentImportSettlementDisposition.Defer, disposition);
+    }
+
+    [TestMethod]
     public async Task DecideAsync_WhenFailureIsTransient_ReturnsRetry()
     {
         using var dbContext = CreateDbContext();

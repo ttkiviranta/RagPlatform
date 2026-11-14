@@ -2,6 +2,7 @@ using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.Options;
 using RagPlatform.Api.Contracts.Documents;
 using RagPlatform.Api.Contracts.Processing;
+using RagPlatform.Api.Models;
 using RagPlatform.Api.Options;
 
 namespace RagPlatform.Api.Services;
@@ -70,20 +71,40 @@ public sealed class DocumentImportBackgroundService : BackgroundService
     {
         using var scope = _serviceScopeFactory.CreateScope();
         var messageHandler = scope.ServiceProvider.GetRequiredService<DocumentImportMessageHandler>();
-        var document = await messageHandler.HandleAsync(args.Message.Body.ToMemory(), args.CancellationToken);
         var importProcessor = scope.ServiceProvider.GetRequiredService<DocumentImportProcessor>();
         var settlementPolicy = scope.ServiceProvider.GetRequiredService<IDocumentImportSettlementPolicy>();
+        Document? document = null;
 
         try
         {
+            document = await messageHandler.HandleAsync(args.Message.Body.ToMemory(), args.CancellationToken);
             await importProcessor.ProcessAsync(document, args.CancellationToken);
+            await importProcessor.ValidateCompletedImportAsync(document.Id, args.CancellationToken);
         }
         catch (OperationCanceledException) when (args.CancellationToken.IsCancellationRequested)
         {
             throw;
         }
+        catch (InvalidDocumentImportMessageException exception)
+        {
+            await args.DeadLetterMessageAsync(
+                args.Message,
+                deadLetterReason: "InvalidDocumentImportMessage",
+                deadLetterErrorDescription: "The document import envelope is invalid and cannot be processed.",
+                cancellationToken: args.CancellationToken);
+            _logger.LogWarning(
+                "Dead-lettered import message {MessageId} due to invalid envelope kind {FailureKind}.",
+                args.Message.MessageId,
+                exception.FailureKind);
+            return;
+        }
         catch (Exception exception)
         {
+            if (document is null)
+            {
+                throw;
+            }
+
             var disposition = await settlementPolicy.DecideAsync(document, exception, args.CancellationToken);
             if (disposition == DocumentImportSettlementDisposition.DeadLetter)
             {
@@ -117,17 +138,29 @@ public sealed class DocumentImportBackgroundService : BackgroundService
             return;
         }
 
-        var successDisposition = await settlementPolicy.DecideAsync(document, null, args.CancellationToken);
+        var processedDocument = document
+            ?? throw new InvalidOperationException("The import message was not validated before settlement.");
+        var successDisposition = await settlementPolicy.DecideAsync(processedDocument, null, args.CancellationToken);
+        if (successDisposition == DocumentImportSettlementDisposition.Complete)
+        {
+            await args.CompleteMessageAsync(args.Message, args.CancellationToken);
+            _logger.LogInformation(
+                "Completed import message {MessageId} after document {DocumentId} completion evidence was validated.",
+                args.Message.MessageId,
+                processedDocument.Id);
+            return;
+        }
+
         if (successDisposition != DocumentImportSettlementDisposition.Defer)
         {
             throw new InvalidOperationException(
-                $"Settlement policy returned unexpected disposition {successDisposition} after successful extraction.");
+                $"Settlement policy returned unexpected disposition {successDisposition} after successful processing.");
         }
 
         _logger.LogInformation(
-            "Processed import message {MessageId} for document {DocumentId}; settlement is deferred until chunking and embeddings are complete.",
+            "Leaving import message {MessageId} unsettled because document {DocumentId} is not ready for completion.",
             args.Message.MessageId,
-            document.Id);
+            processedDocument.Id);
     }
 
     private Task ProcessErrorAsync(ProcessErrorEventArgs args)

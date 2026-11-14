@@ -55,6 +55,33 @@ public sealed class DocumentController : ControllerBase
     }
 
     /// <summary>
+    /// Gets the import status of a document without returning its content or processing data.
+    /// </summary>
+    /// <param name="id">The document identifier.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The document import status and timestamps.</returns>
+    [HttpGet("{id:guid}/import-status")]
+    [ProducesResponseType(typeof(DocumentImportStatusResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<DocumentImportStatusResponse>> GetImportStatusAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var document = await _documentService.GetByIdAsync(id, cancellationToken);
+        if (document is null)
+        {
+            _logger.LogWarning("Document {DocumentId} was not found or is inaccessible for import status.", id);
+            return NotFound();
+        }
+
+        return Ok(new DocumentImportStatusResponse(
+            document.Id,
+            document.ImportStatus?.ToString(),
+            document.CreatedAt,
+            document.UpdatedAt));
+    }
+
+    /// <summary>
     /// Creates a new document.
     /// </summary>
     /// <param name="request">The document to create.</param>

@@ -20,10 +20,10 @@ public sealed class DocumentImportMessageHandlerTests
         using var dbContext = CreateDbContext();
         var handler = CreateHandler(dbContext);
 
-        var exception = await Assert.ThrowsExactlyAsync<InvalidDataException>(
+        var exception = await Assert.ThrowsExactlyAsync<InvalidDocumentImportMessageException>(
             () => handler.HandleAsync(ReadOnlyMemory<byte>.Empty));
 
-        Assert.AreEqual("The document import message body is empty.", exception.Message);
+        Assert.AreEqual(DocumentImportMessageFailureKind.EmptyBody, exception.FailureKind);
     }
 
     [TestMethod]
@@ -32,10 +32,10 @@ public sealed class DocumentImportMessageHandlerTests
         using var dbContext = CreateDbContext();
         var handler = CreateHandler(dbContext);
 
-        var exception = await Assert.ThrowsExactlyAsync<InvalidDataException>(
+        var exception = await Assert.ThrowsExactlyAsync<InvalidDocumentImportMessageException>(
             () => handler.HandleAsync("{"u8.ToArray()));
 
-        Assert.AreEqual("The document import message body is not valid JSON.", exception.Message);
+        Assert.AreEqual(DocumentImportMessageFailureKind.MalformedJson, exception.FailureKind);
         Assert.IsInstanceOfType<JsonException>(exception.InnerException);
     }
 
@@ -46,14 +46,10 @@ public sealed class DocumentImportMessageHandlerTests
         var handler = CreateHandler(dbContext);
         var message = new DocumentImportMessage(Guid.Empty, " ", Guid.Empty, " ", default);
 
-        var exception = await Assert.ThrowsExactlyAsync<InvalidDataException>(
+        var exception = await Assert.ThrowsExactlyAsync<InvalidDocumentImportMessageException>(
             () => handler.HandleAsync(Serialize(message)));
 
-        StringAssert.Contains(exception.Message, nameof(DocumentImportMessage.DocumentId));
-        StringAssert.Contains(exception.Message, nameof(DocumentImportMessage.TenantId));
-        StringAssert.Contains(exception.Message, nameof(DocumentImportMessage.OwnerUserId));
-        StringAssert.Contains(exception.Message, nameof(DocumentImportMessage.StagingBlobKey));
-        StringAssert.Contains(exception.Message, nameof(DocumentImportMessage.CreatedAtUtc));
+        Assert.AreEqual(DocumentImportMessageFailureKind.InvalidRequiredFields, exception.FailureKind);
     }
 
     [TestMethod]
@@ -63,10 +59,10 @@ public sealed class DocumentImportMessageHandlerTests
         var handler = CreateHandler(dbContext);
         var message = CreateMessage();
 
-        var exception = await Assert.ThrowsExactlyAsync<KeyNotFoundException>(
+        var exception = await Assert.ThrowsExactlyAsync<InvalidDocumentImportMessageException>(
             () => handler.HandleAsync(Serialize(message)));
 
-        StringAssert.Contains(exception.Message, message.DocumentId.ToString());
+        Assert.AreEqual(DocumentImportMessageFailureKind.DocumentNotFound, exception.FailureKind);
     }
 
     [TestMethod]
@@ -89,9 +85,10 @@ public sealed class DocumentImportMessageHandlerTests
             _ => throw new ArgumentOutOfRangeException(nameof(mismatchedField))
         };
 
-        await Assert.ThrowsExactlyAsync<InvalidDataException>(
+        var exception = await Assert.ThrowsExactlyAsync<InvalidDocumentImportMessageException>(
             () => handler.HandleAsync(Serialize(message)));
 
+        Assert.AreEqual(DocumentImportMessageFailureKind.DocumentMismatch, exception.FailureKind);
         Assert.AreEqual(DocumentImportStatus.Queued, document.ImportStatus);
         Assert.AreEqual(0, await dbContext.AuditEvents.CountAsync());
     }

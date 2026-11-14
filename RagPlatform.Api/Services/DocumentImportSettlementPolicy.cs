@@ -24,7 +24,30 @@ public sealed class DocumentImportSettlementPolicy : IDocumentImportSettlementPo
 
         if (processingException is null)
         {
-            return DocumentImportSettlementDisposition.Defer;
+            var completedStatePersisted = await _dbContext.Documents
+                .AsNoTracking()
+                .AnyAsync(
+                    candidate => candidate.Id == document.Id
+                        && candidate.ImportStatus == DocumentImportStatus.Completed,
+                    cancellationToken);
+            if (!completedStatePersisted)
+            {
+                return DocumentImportSettlementDisposition.Defer;
+            }
+
+            var completionAuditPersisted = await _dbContext.AuditEvents
+                .AsNoTracking()
+                .AnyAsync(
+                    auditEvent => auditEvent.TenantId == document.TenantId
+                        && auditEvent.EventType == AuditEventTypes.DocumentImportCompleted
+                        && auditEvent.Outcome == "Succeeded"
+                        && auditEvent.TargetType == "Document"
+                        && auditEvent.TargetId == document.Id.ToString(),
+                    cancellationToken);
+
+            return completionAuditPersisted
+                ? DocumentImportSettlementDisposition.Complete
+                : DocumentImportSettlementDisposition.Defer;
         }
 
         var failedStatePersisted = await _dbContext.Documents

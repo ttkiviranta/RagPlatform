@@ -27,7 +27,7 @@ public sealed class DocumentImportMessageHandler
     {
         if (messageBody.IsEmpty)
         {
-            throw new InvalidDataException("The document import message body is empty.");
+            throw new InvalidDocumentImportMessageException(DocumentImportMessageFailureKind.EmptyBody);
         }
 
         DocumentImportMessage? message;
@@ -37,12 +37,14 @@ public sealed class DocumentImportMessageHandler
         }
         catch (JsonException exception)
         {
-            throw new InvalidDataException("The document import message body is not valid JSON.", exception);
+            throw new InvalidDocumentImportMessageException(
+                DocumentImportMessageFailureKind.MalformedJson,
+                exception);
         }
 
         if (message is null)
         {
-            throw new InvalidDataException("The document import message body did not contain a message.");
+            throw new InvalidDocumentImportMessageException(DocumentImportMessageFailureKind.MissingPayload);
         }
 
         var invalidFields = new List<string>();
@@ -73,8 +75,8 @@ public sealed class DocumentImportMessageHandler
 
         if (invalidFields.Count > 0)
         {
-            throw new InvalidDataException(
-                $"The document import message has missing or invalid required fields: {string.Join(", ", invalidFields)}.");
+            throw new InvalidDocumentImportMessageException(
+                DocumentImportMessageFailureKind.InvalidRequiredFields);
         }
 
         var document = await _dbContext.Documents
@@ -82,16 +84,14 @@ public sealed class DocumentImportMessageHandler
 
         if (document is null)
         {
-            throw new KeyNotFoundException(
-                $"Document {message.DocumentId} referenced by the import message does not exist.");
+            throw new InvalidDocumentImportMessageException(DocumentImportMessageFailureKind.DocumentNotFound);
         }
 
         if (!string.Equals(document.TenantId, message.TenantId, StringComparison.Ordinal)
             || document.OwnerUserId != message.OwnerUserId
             || !string.Equals(document.StagingBlobKey, message.StagingBlobKey, StringComparison.Ordinal))
         {
-            throw new InvalidDataException(
-                $"The document import message does not match persisted document {document.Id}.");
+            throw new InvalidDocumentImportMessageException(DocumentImportMessageFailureKind.DocumentMismatch);
         }
 
         if (document.ImportStatus == DocumentImportStatus.Queued)
