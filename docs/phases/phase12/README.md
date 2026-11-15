@@ -4,6 +4,13 @@
 
 Tasks 1-9 are implemented, documented, committed, and pushed. Operational acceptance remains pending: PostgreSQL/pgvector integration validation and isolated Service Bus end-to-end validation are not complete. The worker must remain disabled until these rollout gates pass.
 
+## Phase reports and validation plan
+
+- [Phase 12 completion report](completion-report.md) summarizes Tasks 1-9, architecture decisions, validation status, limitations, and the recommended next step.
+- [Phase 12 acceptance-validation plan](acceptance-validation-plan.md) defines PostgreSQL/pgvector and isolated Service Bus test strategy, the end-to-end acceptance sequence, rollout gates, and rollback procedure.
+
+These documents reconstruct the requested Phase 12 reporting artifacts from prior conversation summaries and repository evidence, and describe evidence that is still pending. They are planning/status records, not evidence that the pending integration or end-to-end tests have passed.
+
 ## Implementation summary
 
 1. Blob Storage and Service Bus options, configuration, and dependency injection.
