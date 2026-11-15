@@ -41,7 +41,11 @@ public sealed class VectorSearchController : ControllerBase
 
         try
         {
-            var response = await _vectorSearchService.SearchAsync(request.Query, request.TopK, cancellationToken);
+            var response = await _vectorSearchService.SearchAsync(
+                request.Query,
+                request.TopK,
+                cancellationToken,
+                request.DocumentId);
             return Ok(response);
         }
         catch (ArgumentOutOfRangeException ex)

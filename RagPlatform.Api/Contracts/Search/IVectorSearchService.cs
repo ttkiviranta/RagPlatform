@@ -5,5 +5,6 @@ public interface IVectorSearchService
     Task<VectorSearchResponse> SearchAsync(
         string query,
         int topK = 5,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        Guid? documentId = null);
 }

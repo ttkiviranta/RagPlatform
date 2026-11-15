@@ -10,4 +10,6 @@ public sealed class VectorSearchRequest
 
     [Range(1, 50)]
     public int TopK { get; set; } = 5;
+
+    public Guid? DocumentId { get; set; }
 }

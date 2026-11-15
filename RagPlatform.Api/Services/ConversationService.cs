@@ -30,7 +30,9 @@ public sealed class ConversationService : IConversationService
 
         return await _dbContext.Conversations
             .AsNoTracking()
-            .Where(conversation => conversation.UserId == currentUser.Id)
+            .Where(conversation =>
+                conversation.UserId == currentUser.Id
+                && conversation.User!.TenantId == currentUser.TenantId)
             .OrderByDescending(conversation => conversation.UpdatedAtUtc)
             .Select(conversation => new ConversationResponse
             {
@@ -50,7 +52,10 @@ public sealed class ConversationService : IConversationService
 
         var conversation = await _dbContext.Conversations
             .AsNoTracking()
-            .Where(conversation => conversation.Id == id && conversation.UserId == currentUser.Id)
+            .Where(conversation =>
+                conversation.Id == id
+                && conversation.UserId == currentUser.Id
+                && conversation.User!.TenantId == currentUser.TenantId)
             .Select(conversation => new ConversationResponse
             {
                 Id = conversation.Id,
@@ -61,7 +66,9 @@ public sealed class ConversationService : IConversationService
             .FirstOrDefaultAsync(cancellationToken);
         if (conversation is null)
         {
-            if (await _dbContext.Conversations.AnyAsync(item => item.Id == id, cancellationToken))
+            if (await _dbContext.Conversations.AnyAsync(
+                item => item.Id == id && item.User!.TenantId == currentUser.TenantId,
+                cancellationToken))
             {
                 await RecordDeniedAccessAsync(currentUser, id, cancellationToken);
             }
@@ -110,12 +117,16 @@ public sealed class ConversationService : IConversationService
         var currentUser = await GetRequiredCurrentUserAsync(cancellationToken);
         var conversation = await _dbContext.Conversations
             .FirstOrDefaultAsync(
-                item => item.Id == id && item.UserId == currentUser.Id,
+                item => item.Id == id
+                    && item.UserId == currentUser.Id
+                    && item.User!.TenantId == currentUser.TenantId,
                 cancellationToken);
 
         if (conversation is null)
         {
-            if (await _dbContext.Conversations.AnyAsync(item => item.Id == id, cancellationToken))
+            if (await _dbContext.Conversations.AnyAsync(
+                item => item.Id == id && item.User!.TenantId == currentUser.TenantId,
+                cancellationToken))
             {
                 await RecordDeniedAccessAsync(currentUser, id, cancellationToken);
             }

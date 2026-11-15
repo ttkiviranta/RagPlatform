@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RagPlatform.Api.Contracts.Audit;
 using RagPlatform.Api.Contracts.Conversations;
 using RagPlatform.Api.Contracts.Identity;
+using RagPlatform.Api.Contracts.Rag;
 using RagPlatform.Api.Data;
 using RagPlatform.Api.Models;
 
@@ -30,11 +31,16 @@ public sealed class ConversationMessageService : IConversationMessageService
         var currentUser = await GetRequiredCurrentUserAsync(cancellationToken);
         var ownsConversation = await _dbContext.Conversations
             .AnyAsync(
-                conversation => conversation.Id == conversationId && conversation.UserId == currentUser.Id,
+                conversation => conversation.Id == conversationId
+                    && conversation.UserId == currentUser.Id
+                    && conversation.User!.TenantId == currentUser.TenantId,
                 cancellationToken);
         if (!ownsConversation)
         {
-            if (await _dbContext.Conversations.AnyAsync(conversation => conversation.Id == conversationId, cancellationToken))
+            if (await _dbContext.Conversations.AnyAsync(
+                conversation => conversation.Id == conversationId
+                    && conversation.User!.TenantId == currentUser.TenantId,
+                cancellationToken))
             {
                 await RecordDeniedAccessAsync(currentUser, conversationId, cancellationToken);
             }
@@ -46,7 +52,8 @@ public sealed class ConversationMessageService : IConversationMessageService
             .AsNoTracking()
             .Where(message =>
                 message.ConversationId == conversationId
-                && message.Conversation!.UserId == currentUser.Id)
+                && message.Conversation!.UserId == currentUser.Id
+                && message.Conversation.User!.TenantId == currentUser.TenantId)
             .OrderBy(message => message.CreatedAtUtc)
             .ThenBy(message => message.Id)
             .Select(message => new ConversationMessageResponse
@@ -55,6 +62,18 @@ public sealed class ConversationMessageService : IConversationMessageService
                 ConversationId = message.ConversationId,
                 Role = message.Role.ToString(),
                 Content = message.Content,
+                Citations = message.Citations
+                    .OrderBy(citation => citation.CitationNumber)
+                    .Select(citation => new RagCitationDto
+                    {
+                        CitationNumber = citation.CitationNumber,
+                        DocumentId = citation.DocumentId,
+                        ChunkId = citation.ChunkId,
+                        SourceName = citation.SourceName,
+                        PageNumber = citation.PageNumber,
+                        Excerpt = citation.Excerpt
+                    })
+                    .ToList(),
                 CreatedAtUtc = message.CreatedAtUtc
             })
             .ToListAsync(cancellationToken);
@@ -74,12 +93,16 @@ public sealed class ConversationMessageService : IConversationMessageService
         var currentUser = await GetRequiredCurrentUserAsync(cancellationToken);
         var conversation = await _dbContext.Conversations
             .FirstOrDefaultAsync(
-                item => item.Id == conversationId && item.UserId == currentUser.Id,
+                item => item.Id == conversationId
+                    && item.UserId == currentUser.Id
+                    && item.User!.TenantId == currentUser.TenantId,
                 cancellationToken);
 
         if (conversation is null)
         {
-            if (await _dbContext.Conversations.AnyAsync(item => item.Id == conversationId, cancellationToken))
+            if (await _dbContext.Conversations.AnyAsync(
+                item => item.Id == conversationId && item.User!.TenantId == currentUser.TenantId,
+                cancellationToken))
             {
                 await RecordDeniedAccessAsync(currentUser, conversationId, cancellationToken);
             }
@@ -122,11 +145,16 @@ public sealed class ConversationMessageService : IConversationMessageService
         var currentUser = await GetRequiredCurrentUserAsync(cancellationToken);
         var ownsConversation = await _dbContext.Conversations
             .AnyAsync(
-                conversation => conversation.Id == conversationId && conversation.UserId == currentUser.Id,
+                conversation => conversation.Id == conversationId
+                    && conversation.UserId == currentUser.Id
+                    && conversation.User!.TenantId == currentUser.TenantId,
                 cancellationToken);
         if (!ownsConversation)
         {
-            if (await _dbContext.Conversations.AnyAsync(conversation => conversation.Id == conversationId, cancellationToken))
+            if (await _dbContext.Conversations.AnyAsync(
+                conversation => conversation.Id == conversationId
+                    && conversation.User!.TenantId == currentUser.TenantId,
+                cancellationToken))
             {
                 await RecordDeniedAccessAsync(currentUser, conversationId, cancellationToken);
             }
@@ -138,7 +166,8 @@ public sealed class ConversationMessageService : IConversationMessageService
             .AsNoTracking()
             .Where(message =>
                 message.ConversationId == conversationId
-                && message.Conversation!.UserId == currentUser.Id)
+                && message.Conversation!.UserId == currentUser.Id
+                && message.Conversation.User!.TenantId == currentUser.TenantId)
             .OrderByDescending(message => message.CreatedAtUtc)
             .ThenByDescending(message => message.Id)
             .Take(maxCount)
@@ -163,11 +192,15 @@ public sealed class ConversationMessageService : IConversationMessageService
         var currentUser = await GetRequiredCurrentUserAsync(cancellationToken);
         var conversation = await _dbContext.Conversations
             .FirstOrDefaultAsync(
-                item => item.Id == conversationId && item.UserId == currentUser.Id,
+                item => item.Id == conversationId
+                    && item.UserId == currentUser.Id
+                    && item.User!.TenantId == currentUser.TenantId,
                 cancellationToken);
         if (conversation is null)
         {
-            if (await _dbContext.Conversations.AnyAsync(item => item.Id == conversationId, cancellationToken))
+            if (await _dbContext.Conversations.AnyAsync(
+                item => item.Id == conversationId && item.User!.TenantId == currentUser.TenantId,
+                cancellationToken))
             {
                 await RecordDeniedAccessAsync(currentUser, conversationId, cancellationToken);
             }
@@ -196,6 +229,101 @@ public sealed class ConversationMessageService : IConversationMessageService
         return true;
     }
 
+    public async Task<Guid?> AppendRagExchangeAsync(
+        Guid? conversationId,
+        string userContent,
+        string assistantContent,
+        IReadOnlyList<RagCitationDto> citations,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userContent);
+        ArgumentException.ThrowIfNullOrWhiteSpace(assistantContent);
+        ArgumentNullException.ThrowIfNull(citations);
+
+        var currentUser = await GetRequiredCurrentUserAsync(cancellationToken);
+        Conversation conversation;
+        var createdConversation = false;
+        if (conversationId.HasValue)
+        {
+            var ownedConversation = await _dbContext.Conversations
+                .FirstOrDefaultAsync(
+                    item => item.Id == conversationId.Value
+                        && item.UserId == currentUser.Id
+                        && item.User!.TenantId == currentUser.TenantId,
+                    cancellationToken);
+            if (ownedConversation is null)
+            {
+                if (await _dbContext.Conversations.AnyAsync(
+                    item => item.Id == conversationId.Value && item.User!.TenantId == currentUser.TenantId,
+                    cancellationToken))
+                {
+                    await RecordDeniedAccessAsync(currentUser, conversationId.Value, cancellationToken);
+                }
+
+                return null;
+            }
+
+            conversation = ownedConversation;
+        }
+        else
+        {
+            var title = userContent.Trim();
+            if (title.Length > 200)
+            {
+                title = title[..197].TrimEnd() + "...";
+            }
+
+            conversation = new Conversation
+            {
+                Title = title,
+                UserId = currentUser.Id
+            };
+            _dbContext.Conversations.Add(conversation);
+            createdConversation = true;
+        }
+
+        var now = DateTime.UtcNow;
+        var userMessage = new ConversationMessage
+        {
+            ConversationId = conversation.Id,
+            Role = ConversationMessageRole.User,
+            Content = userContent,
+            CreatedAtUtc = now
+        };
+        var assistantMessage = new ConversationMessage
+        {
+            ConversationId = conversation.Id,
+            Role = ConversationMessageRole.Assistant,
+            Content = assistantContent,
+            CreatedAtUtc = now.AddMilliseconds(1),
+            Citations = citations.Select(citation => new ConversationCitation
+            {
+                CitationNumber = citation.CitationNumber,
+                DocumentId = citation.DocumentId,
+                ChunkId = citation.ChunkId,
+                SourceName = citation.SourceName,
+                PageNumber = citation.PageNumber,
+                Excerpt = citation.Excerpt
+            }).ToList()
+        };
+
+        conversation.UpdatedAtUtc = assistantMessage.CreatedAtUtc;
+        _dbContext.ConversationMessages.AddRange(userMessage, assistantMessage);
+        if (createdConversation)
+        {
+            _auditEventWriter.Add(
+                currentUser.Id,
+                currentUser.TenantId,
+                AuditEventTypes.ConversationCreated,
+                "Succeeded",
+                "Conversation",
+                conversation.Id.ToString());
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return conversation.Id;
+    }
+
     private async Task RecordDeniedAccessAsync(User currentUser, Guid conversationId, CancellationToken cancellationToken)
     {
         _auditEventWriter.Add(
@@ -216,6 +344,18 @@ public sealed class ConversationMessageService : IConversationMessageService
             ConversationId = message.ConversationId,
             Role = message.Role.ToString(),
             Content = message.Content,
+            Citations = message.Citations
+                .OrderBy(citation => citation.CitationNumber)
+                .Select(citation => new RagCitationDto
+                {
+                    CitationNumber = citation.CitationNumber,
+                    DocumentId = citation.DocumentId,
+                    ChunkId = citation.ChunkId,
+                    SourceName = citation.SourceName,
+                    PageNumber = citation.PageNumber,
+                    Excerpt = citation.Excerpt
+                })
+                .ToList(),
             CreatedAtUtc = message.CreatedAtUtc
         };
     }

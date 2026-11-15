@@ -13,4 +13,6 @@ public sealed class ConversationMessage
     public required string Content { get; set; }
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+
+    public ICollection<ConversationCitation> Citations { get; set; } = new List<ConversationCitation>();
 }

@@ -5,7 +5,7 @@ using RagPlatform.Api.Contracts.Rag;
 
 namespace RagPlatform.Api.Controllers;
 
-[Authorize(Policy = AuthorizationPolicies.ActiveUser)]
+[Authorize(Policy = AuthorizationPolicies.RagQuery)]
 [ApiController]
 [Route("api")]
 public sealed class RagController : ControllerBase

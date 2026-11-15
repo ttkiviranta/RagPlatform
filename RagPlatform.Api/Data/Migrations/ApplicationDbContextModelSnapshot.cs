@@ -46,13 +46,13 @@ namespace RagPlatform.Api.Data.Migrations
                     b.Property<double?>("DurationMilliseconds")
                         .HasColumnType("double precision");
 
-                    b.Property<int?>("GeneratedEmbeddingCount")
-                        .HasColumnType("integer");
-
                     b.Property<string>("EventType")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<int?>("GeneratedEmbeddingCount")
+                        .HasColumnType("integer");
 
                     b.Property<string>("HttpMethod")
                         .HasMaxLength(16)
@@ -158,6 +158,44 @@ namespace RagPlatform.Api.Data.Migrations
                     b.HasIndex("UserId", "UpdatedAtUtc");
 
                     b.ToTable("Conversations");
+                });
+
+            modelBuilder.Entity("RagPlatform.Api.Models.ConversationCitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ChunkId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("CitationNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ConversationMessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Excerpt")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int?>("PageNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SourceName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversationMessageId", "CitationNumber")
+                        .IsUnique();
+
+                    b.ToTable("ConversationCitations");
                 });
 
             modelBuilder.Entity("RagPlatform.Api.Models.ConversationMessage", b =>
@@ -510,6 +548,17 @@ namespace RagPlatform.Api.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("RagPlatform.Api.Models.ConversationCitation", b =>
+                {
+                    b.HasOne("RagPlatform.Api.Models.ConversationMessage", "ConversationMessage")
+                        .WithMany("Citations")
+                        .HasForeignKey("ConversationMessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ConversationMessage");
+                });
+
             modelBuilder.Entity("RagPlatform.Api.Models.ConversationMessage", b =>
                 {
                     b.HasOne("RagPlatform.Api.Models.Conversation", "Conversation")
@@ -586,6 +635,11 @@ namespace RagPlatform.Api.Data.Migrations
             modelBuilder.Entity("RagPlatform.Api.Models.Conversation", b =>
                 {
                     b.Navigation("Messages");
+                });
+
+            modelBuilder.Entity("RagPlatform.Api.Models.ConversationMessage", b =>
+                {
+                    b.Navigation("Citations");
                 });
 
             modelBuilder.Entity("RagPlatform.Api.Models.Document", b =>

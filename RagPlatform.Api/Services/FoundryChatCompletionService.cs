@@ -43,6 +43,16 @@ public sealed class FoundryChatCompletionService : IFoundryChatCompletionService
             throw new InvalidOperationException("Foundry:MaxOutputTokens must be greater than zero.");
         }
 
+        if (_options.ChatTimeoutSeconds <= 0 || _options.ChatTimeoutSeconds > 60)
+        {
+            throw new InvalidOperationException("Foundry:ChatTimeoutSeconds must be between 1 and 60.");
+        }
+
+        if (!double.IsFinite(_options.ChatTemperature) || _options.ChatTemperature is < 0 or > 2)
+        {
+            throw new InvalidOperationException("Foundry:ChatTemperature must be between 0 and 2.");
+        }
+
         var deployment = _options.ChatDeployment.Trim();
         var currentUser = await _currentUserService.GetCurrentUserAsync(cancellationToken);
         var stopwatch = Stopwatch.StartNew();
@@ -70,11 +80,27 @@ public sealed class FoundryChatCompletionService : IFoundryChatCompletionService
         (string Answer, int? InputTokenCount, int? OutputTokenCount) completion;
         try
         {
-            completion = await _inferenceClient.CompleteChatAsync(
-                deployment,
-                chatMessages,
-                _options.MaxOutputTokens,
-                cancellationToken);
+            using var timeoutSource = new CancellationTokenSource(TimeSpan.FromSeconds(_options.ChatTimeoutSeconds));
+            using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                timeoutSource.Token);
+
+            try
+            {
+                completion = await _inferenceClient.CompleteChatAsync(
+                    deployment,
+                    chatMessages,
+                    _options.MaxOutputTokens,
+                    _options.ChatTemperature,
+                    linkedSource.Token);
+            }
+            catch (OperationCanceledException exception)
+                when (!cancellationToken.IsCancellationRequested && timeoutSource.IsCancellationRequested)
+            {
+                throw new TimeoutException(
+                    $"Foundry chat completion exceeded the configured timeout of {_options.ChatTimeoutSeconds} seconds.",
+                    exception);
+            }
         }
         catch
         {

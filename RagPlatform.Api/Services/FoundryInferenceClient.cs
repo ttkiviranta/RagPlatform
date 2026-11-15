@@ -44,6 +44,7 @@ public sealed class FoundryInferenceClient
         string deployment,
         IReadOnlyList<RagChatMessage> messages,
         int maxOutputTokens,
+        double temperature,
         CancellationToken cancellationToken)
     {
         var response = await PostAsync<ChatCompletionResponse>(
@@ -56,7 +57,8 @@ public sealed class FoundryInferenceClient
                     role = message.Role.ToLowerInvariant(),
                     content = message.Content
                 }),
-                max_tokens = maxOutputTokens
+                max_tokens = maxOutputTokens,
+                temperature
             },
             cancellationToken);
         var answer = response.Choices.FirstOrDefault()?.Message?.Content;

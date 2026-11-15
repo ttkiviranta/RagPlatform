@@ -4,5 +4,5 @@ public interface IPromptBuilder
 {
     string BuildSystemPrompt();
 
-    string BuildPrompt(string question, string context);
+    string BuildPrompt(string question, string context, string conversationHistory = "");
 }

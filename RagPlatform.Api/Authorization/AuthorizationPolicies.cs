@@ -3,6 +3,8 @@ namespace RagPlatform.Api.Authorization;
 public static class AuthorizationPolicies
 {
     public const string ActiveUser = "ActiveUser";
+    public const string RagQuery = "RagQuery";
+    public const string ConversationAccess = "ConversationAccess";
     public const string DocumentRead = "DocumentRead";
     public const string DocumentWrite = "DocumentWrite";
     public const string DocumentDelete = "DocumentDelete";

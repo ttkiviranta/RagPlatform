@@ -10,36 +10,32 @@ namespace RagPlatform.Api.Services;
 
 public sealed class RagService : IRagService
 {
-    private const int MaxConversationHistoryCharacters = 4000;
     private readonly IVectorSearchService _vectorSearchService;
-    private readonly IContextBuilder _contextBuilder;
-    private readonly IPromptBuilder _promptBuilder;
+    private readonly IRagCitationService _citationService;
     private readonly ITelemetryService _telemetryService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IAuditEventWriter _auditEventWriter;
+    private readonly IAnswerGenerationService _answerGenerationService;
     private readonly IConversationMessageService _conversationMessageService;
-    private readonly IFoundryChatCompletionService _chatCompletionService;
     private readonly ILogger<RagService> _logger;
 
     public RagService(
         IVectorSearchService vectorSearchService,
-        IContextBuilder contextBuilder,
-        IPromptBuilder promptBuilder,
+        IRagCitationService citationService,
         ITelemetryService telemetryService,
         ICurrentUserService currentUserService,
         IAuditEventWriter auditEventWriter,
+        IAnswerGenerationService answerGenerationService,
         IConversationMessageService conversationMessageService,
-        IFoundryChatCompletionService chatCompletionService,
         ILogger<RagService> logger)
     {
         _vectorSearchService = vectorSearchService;
-        _contextBuilder = contextBuilder;
-        _promptBuilder = promptBuilder;
+        _citationService = citationService;
         _telemetryService = telemetryService;
         _currentUserService = currentUserService;
         _auditEventWriter = auditEventWriter;
+        _answerGenerationService = answerGenerationService;
         _conversationMessageService = conversationMessageService;
-        _chatCompletionService = chatCompletionService;
         _logger = logger;
     }
 
@@ -78,53 +74,41 @@ public sealed class RagService : IRagService
             {
                 conversationHistory = await _conversationMessageService.GetRecentMessagesAsync(
                     conversationId.Value,
-                    10,
+                    20,
                     cancellationToken)
-                    ?? throw new KeyNotFoundException($"Conversation {conversationId.Value} was not found.");
+                    ?? throw new KeyNotFoundException("Conversation was not found.");
             }
 
             var searchResponse = await _vectorSearchService.SearchAsync(query, topK, cancellationToken);
-            var retrievedChunks = searchResponse.Results
-                .Select(result => new RagRetrievedChunk
-                {
-                    ChunkId = result.ChunkId,
-                    DocumentId = result.DocumentId,
-                    SimilarityScore = result.SimilarityScore
-                })
-                .ToList();
-            retrievedChunkCount = retrievedChunks.Count;
-
-            var generatedContext = _contextBuilder.BuildContext(searchResponse.Results);
-            var generatedPrompt = _promptBuilder.BuildPrompt(query, generatedContext);
-            contextCharacterCount = generatedContext.Length;
-            promptCharacterCount = generatedPrompt.Length;
-            var chatMessages = BuildConversationHistory(conversationHistory);
-            chatMessages.Add(new RagChatMessage
-            {
-                Role = "User",
-                Content = generatedPrompt
-            });
-            var completion = await _chatCompletionService.CompleteAsync(
-                _promptBuilder.BuildSystemPrompt(),
-                chatMessages,
+            retrievedChunkCount = searchResponse.Results.Count;
+            var availableCitations = await _citationService.CreateCitationsAsync(
+                searchResponse.Results,
                 cancellationToken);
-
-            if (conversationId.HasValue
-                && !await _conversationMessageService.AppendExchangeAsync(
-                    conversationId.Value,
-                    query,
-                    completion.Answer,
-                    cancellationToken))
-            {
-                throw new KeyNotFoundException($"Conversation {conversationId.Value} was not found.");
-            }
+            var answerResult = await _answerGenerationService.GenerateAnswerAsync(
+                query,
+                availableCitations,
+                conversationHistory,
+                cancellationToken);
+            contextCharacterCount = answerResult.ContextCharacterCount;
+            promptCharacterCount = answerResult.PromptCharacterCount;
+            var citedCitationNumbers = answerResult.CitationNumbers.ToHashSet();
+            var citedSources = availableCitations
+                .Where(citation => citedCitationNumbers.Contains(citation.CitationNumber))
+                .ToList();
+            var persistedConversationId = await _conversationMessageService.AppendRagExchangeAsync(
+                conversationId,
+                query,
+                answerResult.Answer,
+                citedSources,
+                cancellationToken)
+                ?? throw new KeyNotFoundException("Conversation was not found.");
 
             _telemetryService.TrackRagQuery(
                 query.Length,
                 topK,
-                retrievedChunks.Count,
-                generatedContext.Length,
-                generatedPrompt.Length,
+                retrievedChunkCount,
+                contextCharacterCount,
+                promptCharacterCount,
                 stopwatch.Elapsed.TotalMilliseconds,
                 true);
             _logger.LogInformation(
@@ -134,11 +118,9 @@ public sealed class RagService : IRagService
 
             response = new RagQueryResponse
             {
-                Query = query,
-                Answer = completion.Answer,
-                Sources = retrievedChunks,
-                ConversationId = conversationId,
-                GeneratedAt = DateTime.UtcNow
+                ConversationId = persistedConversationId,
+                Answer = answerResult.Answer,
+                Citations = citedSources
             };
         }
         catch (Exception ex)
@@ -182,40 +164,4 @@ public sealed class RagService : IRagService
         return response;
     }
 
-    private static List<RagChatMessage> BuildConversationHistory(
-        IReadOnlyList<ConversationMessageResponse> conversationHistory)
-    {
-        var selectedMessages = new List<RagChatMessage>();
-        var remainingCharacters = MaxConversationHistoryCharacters;
-
-        foreach (var message in conversationHistory.Reverse())
-        {
-            if (remainingCharacters == 0)
-            {
-                break;
-            }
-
-            if (!string.Equals(message.Role, "User", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(message.Role, "Assistant", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            var content = message.Content;
-            if (content.Length > remainingCharacters)
-            {
-                content = content[^remainingCharacters..];
-            }
-
-            selectedMessages.Add(new RagChatMessage
-            {
-                Role = message.Role,
-                Content = content
-            });
-            remainingCharacters -= content.Length;
-        }
-
-        selectedMessages.Reverse();
-        return selectedMessages;
-    }
 }

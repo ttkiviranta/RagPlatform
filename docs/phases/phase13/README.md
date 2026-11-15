@@ -20,12 +20,35 @@ The repository README records Increment 1 as complete: query/answer/citation/con
 
 The associated API build succeeded in the working tree at archive time. The DTO/policy source edits were uncommitted and are not included in the documentation archive commit. This increment does not establish citation population, conversation citation persistence, retrieval implementation, or full Phase 13 acceptance.
 
+## Increment 2 - authorized vector retrieval
+
+Increment 2 adds an optional document scope to the vector-search request and performs model- and dimension-compatible pgvector cosine ranking in PostgreSQL. Tenant, owner/role access, and optional document filtering are part of the same query. Query vector dimensions are checked before search; model name, persisted dimension metadata, and actual vector dimensions are checked before a stored vector can be ranked. This increment does not add answer generation or citation population. See [Increment 2 design and implementation notes](increment02-authorized-vector-retrieval.md).
+
+The API build is the compile validation for this increment. Query execution, pgvector SQL translation, and access-filter behavior still require PostgreSQL/pgvector integration tests; EF Core InMemory cannot validate those behaviors.
+
+## Increment 3 - grounded answer generation
+
+Increment 3 adds `IAnswerGenerationService`, backed by `FoundryAnswerGenerationService`, which builds context capped at 4,000 characters and returns answer text only. It delegates chat transport to the existing Foundry completion service, now configured for deployment, output-token limit, timeout, and temperature. The deterministic system prompt limits answers to retrieved context, treats it as untrusted data, and requires the explicit `not found in accessible documents` response when evidence is insufficient. Empty retrieval returns that response without a model call.
+
+No citations or conversation history are passed to the model. RAG queries are stateless and do not persist exchanges in this increment; the separate conversation endpoints are unchanged. See [Increment 3 design and implementation notes](increment03-grounded-answer-generation.md). Build success does not establish live Foundry or answer-quality validation.
+
+## Increment 4 - validated citations
+
+Increment 4 reloads retrieved chunk/document data from PostgreSQL under the existing document-access scope, assigns `[1]`, `[2]`, … labels in retrieval order, and sends bounded persisted excerpts to Foundry. The answer prompt requires supplied labels only. The API rejects unsupported labels and non-fallback answers that cite no supplied label, then returns only validated citations with persisted IDs/source name and a capped excerpt. Page numbers are null because the current chunk model stores no page field. Model-generated source metadata is never trusted. See [Increment 4 implementation notes](increment04-validated-citations.md).
+
+RAG query execution remains stateless; no conversation history or exchange persistence is added. Build validation does not replace PostgreSQL/Foundry integration or semantic-grounding evaluation.
+
+## Increment 5 - conversation persistence
+
+Increment 5 connects each successful RAG request to the owner-scoped conversation store. `ConversationId` is optional in the request; omitting it creates a conversation with the first question as its title. The response includes the resulting ID. User/assistant turns and validated citation snapshots are saved together, and conversation-message reads return the persisted citations.
+
+Conversation queries enforce both owner and tenant boundaries. Every turn performs fresh authorized retrieval using the current question; prior assistant answers are not included in the prompt or used as evidence. At most six prior user messages and 2,000 characters are provided only to interpret follow-up references.
+
+Owner-authorized conversation deletion cascades to turns and citation snapshots. No automatic retention period or purge worker is configured; its policy and operational design are documented in [Increment 5 implementation notes](increment05-conversation-persistence.md). PostgreSQL and isolation validation remain outstanding.
+
 ## Remaining increments and acceptance
 
-- Implement authorized vector retrieval and prove cross-user/tenant isolation.
-- Add Foundry grounded answer generation with safe timeouts/errors and evidence-based abstention.
-- Populate validated citations from persisted chunk/document metadata.
-- Persist citations with owner-protected conversation turns and apply retention/deletion rules.
+- Select and operationalize a tenant/legal retention period and scheduled purge policy.
 - Evaluate retrieval, answer grounding, prompt-injection resistance, latency, reliability, and cost against explicit targets.
 
 ## Missing documentation

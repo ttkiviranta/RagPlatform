@@ -1,3 +1,5 @@
+using RagPlatform.Api.Contracts.Rag;
+
 namespace RagPlatform.Api.Contracts.Conversations;
 
 public interface IConversationMessageService
@@ -20,5 +22,12 @@ public interface IConversationMessageService
         Guid conversationId,
         string userContent,
         string assistantContent,
+        CancellationToken cancellationToken = default);
+
+    Task<Guid?> AppendRagExchangeAsync(
+        Guid? conversationId,
+        string userContent,
+        string assistantContent,
+        IReadOnlyList<RagCitationDto> citations,
         CancellationToken cancellationToken = default);
 }

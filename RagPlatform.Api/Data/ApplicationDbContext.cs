@@ -30,12 +30,18 @@ public sealed class ApplicationDbContext : DbContext
 
     public DbSet<ConversationMessage> ConversationMessages => Set<ConversationMessage>();
 
+    public DbSet<ConversationCitation> ConversationCitations => Set<ConversationCitation>();
+
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.HasPostgresExtension("vector");
+        modelBuilder.HasDbFunction(
+                typeof(PgvectorFunctions).GetMethod(nameof(PgvectorFunctions.VectorDimensions))!)
+            .HasName("vector_dims")
+            .IsBuiltIn();
 
         modelBuilder.Entity<Document>(entity =>
         {
@@ -247,6 +253,24 @@ public sealed class ApplicationDbContext : DbContext
             entity.Property(message => message.CreatedAtUtc)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(message => new { message.ConversationId, message.CreatedAtUtc, message.Id });
+        });
+
+        modelBuilder.Entity<ConversationCitation>(entity =>
+        {
+            entity.HasKey(citation => citation.Id);
+            entity.Property(citation => citation.CitationNumber)
+                .IsRequired();
+            entity.Property(citation => citation.SourceName)
+                .HasMaxLength(200);
+            entity.Property(citation => citation.Excerpt)
+                .IsRequired()
+                .HasMaxLength(500);
+            entity.HasIndex(citation => new { citation.ConversationMessageId, citation.CitationNumber })
+                .IsUnique();
+            entity.HasOne(citation => citation.ConversationMessage)
+                .WithMany(message => message.Citations)
+                .HasForeignKey(citation => citation.ConversationMessageId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<AuditEvent>(entity =>

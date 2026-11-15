@@ -73,7 +73,7 @@ builder.Services.AddSingleton<ServiceBusSender>(serviceProvider =>
 builder.Services.AddSingleton<IDocumentImportMessagePublisher, ServiceBusDocumentImportMessagePublisher>();
 builder.Services.AddHttpClient("FoundryInference", client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(60);
+    client.Timeout = TimeSpan.FromSeconds(65);
 });
 builder.Services.AddScoped<FoundryInferenceClient>();
 
@@ -160,6 +160,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy(AuthorizationPolicies.ActiveUser, policy =>
+        policy.RequireAuthenticatedUser()
+            .AddRequirements(new ActiveUserRequirement()));
+    options.AddPolicy(AuthorizationPolicies.RagQuery, policy =>
+        policy.RequireAuthenticatedUser()
+            .AddRequirements(new ActiveUserRequirement()));
+    options.AddPolicy(AuthorizationPolicies.ConversationAccess, policy =>
         policy.RequireAuthenticatedUser()
             .AddRequirements(new ActiveUserRequirement()));
     options.AddPolicy(AuthorizationPolicies.DocumentRead, policy =>
@@ -284,6 +290,8 @@ builder.Services.AddScoped<IEmbeddingService, EmbeddingService>();
 builder.Services.AddScoped<IVectorSearchService, VectorSearchService>();
 builder.Services.AddScoped<IContextBuilder, ContextBuilder>();
 builder.Services.AddScoped<IPromptBuilder, PromptBuilder>();
+builder.Services.AddScoped<IRagCitationService, RagCitationService>();
+builder.Services.AddScoped<IAnswerGenerationService, FoundryAnswerGenerationService>();
 builder.Services.AddScoped<IRagService, RagService>();
 builder.Services.AddScoped<IFoundryChatCompletionService, FoundryChatCompletionService>();
 builder.Services.AddScoped<ITelemetryService, ApplicationInsightsTelemetryService>();

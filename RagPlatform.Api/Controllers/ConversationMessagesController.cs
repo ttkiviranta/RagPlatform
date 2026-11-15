@@ -5,7 +5,7 @@ using RagPlatform.Api.Contracts.Conversations;
 
 namespace RagPlatform.Api.Controllers;
 
-[Authorize(Policy = AuthorizationPolicies.ActiveUser)]
+[Authorize(Policy = AuthorizationPolicies.ConversationAccess)]
 [ApiController]
 [Route("api/conversations/{conversationId:guid}/messages")]
 public sealed class ConversationMessagesController : ControllerBase

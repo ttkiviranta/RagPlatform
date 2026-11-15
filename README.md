@@ -858,7 +858,9 @@ Document Import & Knowledge Ingestion extends the Phase 11 inference and vector-
   - Do not retain original PDFs as document assets; use Blob Storage only for temporary staging
   - Keep the existing solution structure: no dedicated worker project, outbox pattern, or major project split in this MVP
   - Defer OCR, SharePoint/OneDrive import, URL crawling, web crawler ingestion, document versioning, and automatic document refresh
-- ⬜ Phase 13 - Document Q&A
+- 🚧 Phase 13 - Document Q&A
+  - ✅ Increments 1–5 implemented: contracts and authorization, authorized vector retrieval, grounded Foundry answers, validated citations, and owner/tenant-scoped conversation persistence
+  - ⬜ Acceptance validation remains: PostgreSQL/pgvector and Foundry integration, retrieval and answer-quality evaluation, security review, retention policy, and latency/cost targets
   - Ask questions against imported documents
   - Source citations
   - Retrieval validation
