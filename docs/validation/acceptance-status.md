@@ -11,7 +11,7 @@
 | 10D | Complete/validated | Audit events persisted with expected outcomes/targets | Query API, retention/purge, and governance reporting are out of scope |
 | 11 | Complete/validated | Foundry auth, embedding/vector flow, grounded chat, scoping, and audit | Current deployment identifiers and model evaluation data are not archived |
 | 12 | Implementation complete; rollout pending | Successful builds and upload/message-publish evidence are documented | PostgreSQL/pgvector integration and isolated Service Bus E2E validation |
-| 13 | In progress | Increment 1 API build reported successful; contract/policy scope recorded | Retrieval/citations over imports, end-to-end tests, quality/security/performance evaluation, and rollout evidence |
+| 13 | In progress; increments 1-6 implemented | Full solution build; five focused prompt/evidence/failure-telemetry tests pass; retrieval and answer telemetry implemented | PostgreSQL/pgvector and live Foundry validation, live prompt-injection evaluation, quality/performance baselines, retention policy, and rollout evidence remain |
 
 ## Phase 12 required acceptance evidence
 
@@ -30,6 +30,7 @@ EF Core InMemory does not map `Pgvector.Vector`; the documented test failures oc
 - Tests for missing evidence/abstention, invalid citation labels, and prompt-injection text in retrieved documents.
 - Owner authorization and retention/deletion tests for conversation history and citations.
 - Foundry failure/timeout tests and measured latency, token usage, and cost against agreed targets.
+- Review retrieval/answer telemetry in Application Insights, establish p95/p99 baselines, and validate failure/abstention alerts without collecting prompt or document content.
 
 ## Evidence quality note
 

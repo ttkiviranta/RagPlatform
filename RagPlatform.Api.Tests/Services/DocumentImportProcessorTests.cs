@@ -750,10 +750,26 @@ public sealed class DocumentImportProcessorTests
         public void TrackVectorSearch(
             string modelName,
             int topK,
+            int candidateChunkCount,
             int resultCount,
             double averageSimilarity,
             double durationMs,
-            bool success)
+            bool success,
+            string? failureType = null)
+        {
+        }
+
+        public void TrackAnswerGeneration(
+            string provider,
+            string deployment,
+            int returnedChunkCount,
+            int citationCount,
+            double durationMs,
+            int? inputTokenCount,
+            int? outputTokenCount,
+            bool success,
+            string outcome,
+            string? failureType = null)
         {
         }
 

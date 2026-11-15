@@ -46,10 +46,16 @@ Conversation queries enforce both owner and tenant boundaries. Every turn perfor
 
 Owner-authorized conversation deletion cascades to turns and citation snapshots. No automatic retention period or purge worker is configured; its policy and operational design are documented in [Increment 5 implementation notes](increment05-conversation-persistence.md). PostgreSQL and isolation validation remain outstanding.
 
+## Increment 6 - quality telemetry and hardening
+
+Increment 6 adds retrieval telemetry for duration, candidate/returned chunk counts, similarity, and failure type. Answer-generation telemetry records duration, returned chunks, validated citation count, Foundry provider/deployment, token usage when provided, and distinct no-context, insufficient-evidence, generation-failure, and citation-validation-failure outcomes. Structured logs report stage and counts without query, prompt, source excerpt, or answer content. See [Increment 6 implementation notes](increment06-quality-and-hardening.md).
+
+Deterministic tests cover untrusted-context prompt framing, omission of prior assistant answers, no-context abstention, low-evidence abstention, and failure telemetry. The full solution build succeeds and all five focused hardening tests pass. Live-model resilience and database/runtime telemetry still need integration evidence.
+
 ## Remaining increments and acceptance
 
 - Select and operationalize a tenant/legal retention period and scheduled purge policy.
-- Evaluate retrieval, answer grounding, prompt-injection resistance, latency, reliability, and cost against explicit targets.
+- Evaluate retrieval, answer grounding, live prompt-injection resistance, latency, reliability, and cost against explicit targets.
 
 ## Missing documentation
 

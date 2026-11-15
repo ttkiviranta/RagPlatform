@@ -105,19 +105,72 @@ public sealed class ApplicationInsightsTelemetryService : ITelemetryService
         _telemetryClient.TrackMetric("ReusedEmbeddingCount", reusedEmbeddingCount, properties);
     }
 
-    public void TrackVectorSearch(string modelName, int topK, int resultCount, double averageSimilarity, double durationMs, bool success)
+    public void TrackVectorSearch(
+        string modelName,
+        int topK,
+        int candidateChunkCount,
+        int returnedChunkCount,
+        double averageSimilarity,
+        double durationMs,
+        bool success,
+        string? failureType = null)
     {
         var properties = new Dictionary<string, string>
         {
             ["ModelName"] = modelName,
             ["Success"] = success.ToString()
         };
+        if (!string.IsNullOrWhiteSpace(failureType))
+        {
+            properties["FailureType"] = failureType;
+        }
 
         _telemetryClient.TrackEvent("VectorSearch", properties);
         _telemetryClient.TrackMetric("VectorSearchDurationMs", durationMs, properties);
         _telemetryClient.TrackMetric("TopK", topK, properties);
-        _telemetryClient.TrackMetric("ResultCount", resultCount, properties);
+        _telemetryClient.TrackMetric("CandidateChunkCount", candidateChunkCount, properties);
+        _telemetryClient.TrackMetric("ReturnedChunkCount", returnedChunkCount, properties);
+        _telemetryClient.TrackMetric("ResultCount", returnedChunkCount, properties);
         _telemetryClient.TrackMetric("AverageSimilarity", averageSimilarity, properties);
+    }
+
+    public void TrackAnswerGeneration(
+        string provider,
+        string deployment,
+        int returnedChunkCount,
+        int citationCount,
+        double durationMs,
+        int? inputTokenCount,
+        int? outputTokenCount,
+        bool success,
+        string outcome,
+        string? failureType = null)
+    {
+        var properties = new Dictionary<string, string>
+        {
+            ["Provider"] = provider,
+            ["Deployment"] = deployment,
+            ["Outcome"] = outcome,
+            ["Success"] = success.ToString()
+        };
+        if (!string.IsNullOrWhiteSpace(failureType))
+        {
+            properties["FailureType"] = failureType;
+        }
+
+        _telemetryClient.TrackEvent("AnswerGeneration", properties);
+        _telemetryClient.TrackMetric("AnswerGenerationDurationMs", durationMs, properties);
+        _telemetryClient.TrackMetric("AnswerReturnedChunkCount", returnedChunkCount, properties);
+        _telemetryClient.TrackMetric("AnswerCitationCount", citationCount, properties);
+        if (inputTokenCount.HasValue)
+        {
+            _telemetryClient.TrackMetric("AnswerInputTokenCount", inputTokenCount.Value, properties);
+        }
+
+        if (outputTokenCount.HasValue)
+        {
+            _telemetryClient.TrackMetric("AnswerOutputTokenCount", outputTokenCount.Value, properties);
+        }
     }
 
     public void TrackRagQuery(int inputCharacterCount, int topK, int retrievedChunkCount, int contextLength, int promptLength, double durationMs, bool success)

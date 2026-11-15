@@ -86,6 +86,7 @@ public sealed class RagService : IRagService
                 cancellationToken);
             var answerResult = await _answerGenerationService.GenerateAnswerAsync(
                 query,
+                retrievedChunkCount,
                 availableCitations,
                 conversationHistory,
                 cancellationToken);
@@ -112,8 +113,9 @@ public sealed class RagService : IRagService
                 stopwatch.Elapsed.TotalMilliseconds,
                 true);
             _logger.LogInformation(
-                "RAG query completed with {ResultCount} relevant chunks in {DurationMs} ms.",
+                "RAG query completed with {ResultCount} retrieved chunks and {CitationCount} citations in {DurationMs} ms.",
                 retrievedChunkCount,
+                citedSources.Count,
                 stopwatch.Elapsed.TotalMilliseconds);
 
             response = new RagQueryResponse

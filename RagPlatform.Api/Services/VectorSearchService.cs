@@ -61,6 +61,8 @@ public sealed class VectorSearchService : IVectorSearchService
         var stopwatch = Stopwatch.StartNew();
         User? currentUser = null;
         var embeddingModelName = "unknown";
+        var candidateChunkCount = 0;
+        var returnedChunkCount = 0;
         VectorSearchResponse response;
 
         try
@@ -103,6 +105,7 @@ public sealed class VectorSearchService : IVectorSearchService
                 embeddingQuery = embeddingQuery.Where(embedding => embedding.Chunk.DocumentId == documentId.Value);
             }
 
+            candidateChunkCount = await embeddingQuery.CountAsync(cancellationToken);
             var rankedEmbeddings = await embeddingQuery
                 .Select(embedding => new
                 {
@@ -114,6 +117,7 @@ public sealed class VectorSearchService : IVectorSearchService
                 .OrderBy(result => result.Distance)
                 .Take(topK)
                 .ToListAsync(cancellationToken);
+            returnedChunkCount = rankedEmbeddings.Count;
 
             var mappedResults = rankedEmbeddings
                 .Select(result => new VectorSearchResult
@@ -132,14 +136,16 @@ public sealed class VectorSearchService : IVectorSearchService
             _telemetryService.TrackVectorSearch(
                 embeddingModelName,
                 topK,
-                mappedResults.Count,
+                candidateChunkCount,
+                returnedChunkCount,
                 averageSimilarity,
                 stopwatch.Elapsed.TotalMilliseconds,
                 true);
 
             _logger.LogInformation(
-                "Vector search completed with {ResultCount} relevant chunks in {DurationMs} ms.",
+                "Vector search returned {ReturnedChunkCount} of {CandidateChunkCount} candidate chunks in {DurationMs} ms.",
                 mappedResults.Count,
+                candidateChunkCount,
                 stopwatch.Elapsed.TotalMilliseconds);
 
             response = new VectorSearchResponse
@@ -166,10 +172,12 @@ public sealed class VectorSearchService : IVectorSearchService
             _telemetryService.TrackVectorSearch(
                 embeddingModelName,
                 topK,
-                0,
+                candidateChunkCount,
+                returnedChunkCount,
                 0,
                 stopwatch.Elapsed.TotalMilliseconds,
-                false);
+                false,
+                ex.GetType().Name);
             if (currentUser is not null)
             {
                 _auditEventWriter.Add(
