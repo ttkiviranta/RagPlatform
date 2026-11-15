@@ -10,8 +10,10 @@
 | 10C | Complete/validated | User A conversation access; User B denied/404; Postman workflow | Archived raw test output is absent |
 | 10D | Complete/validated | Audit events persisted with expected outcomes/targets | Query API, retention/purge, and governance reporting are out of scope |
 | 11 | Complete/validated | Foundry auth, embedding/vector flow, grounded chat, scoping, and audit | Current deployment identifiers and model evaluation data are not archived |
-| 12 | Implementation complete; rollout pending | Successful builds and upload/message-publish evidence are documented | PostgreSQL/pgvector integration and isolated Service Bus E2E validation |
-| 13 | In progress; increments 1-6 implemented | Full solution build; five focused prompt/evidence/failure-telemetry tests pass; retrieval and answer telemetry implemented | PostgreSQL/pgvector and live Foundry validation, live prompt-injection evaluation, quality/performance baselines, retention policy, and rollout evidence remain |
+| 12 | Implementation complete; acceptance and rollout pending | Successful builds and upload/message-publish evidence are documented | PostgreSQL/pgvector integration and isolated Service Bus E2E validation, including settlement/retry/DLQ evidence |
+| 13 | Implementation complete; acceptance pending | Full solution build; five focused prompt/evidence/failure-telemetry tests pass; retrieval and answer telemetry implemented | PostgreSQL/pgvector and live Foundry validation, live prompt-injection evaluation, quality/performance baselines, retention policy, and rollout evidence remain |
+
+See the [combined Phase 12-13 validation roadmap](phase12-phase13-validation-roadmap.md) for execution environments, validation order, and production-readiness assessment.
 
 ## Phase 12 required acceptance evidence
 
