@@ -1,6 +1,6 @@
 # Project Documentation Archive
 
-This archive consolidates phase documentation available in the repository as of 2026-11-15. It is an index and curated summary, not a claim that missing design records, test logs, or operational reports were recovered.
+This archive consolidates phase documentation available in the repository as of 2026-11-15. It is an index and curated summary, not a claim that missing design records, test logs, or operational reports were recovered. The Phase 14 proposal and proposed roadmap alignment below were added on 2026-11-16 and do not change the historical archive snapshot.
 
 ## Phase archive
 
@@ -18,6 +18,23 @@ This archive consolidates phase documentation available in the repository as of 
 - [Phase 12 - Document Import and Knowledge Ingestion](phases/phase12/README.md)
 - [Phase 13 - Document Q&A](phases/phase13/README.md)
 
+## Roadmap proposals
+
+- [Phase 14 proposal - Adaptive Retrieval and Fallback Strategy](phases/phase14/proposal.md) (proposed; not approved)
+  - [Phase 14 implementation plan](phases/phase14/implementation-plan.md)
+
+The proposal recommends this future sequence, subject to project-owner approval:
+
+| Proposed phase | Theme | Roadmap change |
+| --- | --- | --- |
+| 14 | Adaptive Retrieval and Fallback Strategy: File First, Vector RAG, and policy-controlled Model Knowledge/Web Search with provenance | New proposed focus |
+| 15 | Copilot Studio Integration | Moved from the earlier Phase 14 position |
+| 16 | GraphRAG | Preserved |
+| 17 | Administration | Preserved |
+| 18 | AI Engineering and Operations | Added phase to preserve this earlier theme without merging it |
+
+This is a proposal, not an approved implementation commitment. Phase 12/13 acceptance remains pending and is a prerequisite to implementation and enablement.
+
 ## Cross-cutting archive
 
 - [Architecture decisions](architecture/decisions.md)
@@ -32,7 +49,7 @@ This archive consolidates phase documentation available in the repository as of 
 3. `RagPlatform.Api/Data/Migrations/` - migration names used to retain schema-change references in the phase archive.
 4. Git history - phase implementation and documentation commit subjects, retained as short commit references in the phase records.
 
-The repository contains no other Markdown, reStructuredText, AsciiDoc, or text documentation files. No standalone Phase 1-9 completion reports, architecture decision records, validation plans, retrospectives, or lessons-learned reports were present. The available README summaries have been preserved; unavailable evidence is called out in each phase record rather than inferred.
+At the 2026-11-15 archive snapshot, no other Markdown, reStructuredText, AsciiDoc, or text documentation files were identified. No standalone Phase 1-9 completion reports, architecture decision records, validation plans, retrospectives, or lessons-learned reports were present then. The available README summaries have been preserved; unavailable evidence is called out in each phase record rather than inferred. The later Phase 14 proposal is indexed above and is not part of that snapshot's source inventory.
 
 The Postman README contains tenant/application identifiers used to configure OAuth. They are not repeated in this archive; use the existing local Postman setup and never add tokens or secrets to committed documentation.
 

@@ -17,7 +17,7 @@ The repository README marks Phases 1-11 complete. Phase 12 Tasks 1-9 are impleme
 - EF Core InMemory is not a valid test provider for the full pgvector model.
 - Staging-aware deletion and abandoned-Blob cleanup remain unfinished; delivery retry behavior relies on Service Bus lock expiry and broker limits.
 - Phase 13 still needs PostgreSQL/pgvector retrieval and conversation-persistence validation, live Foundry validation, answer-grounding and abstention evaluation, live prompt-injection/security testing, latency/cost baselines, and an approved operational retention/purge policy. Citation-label validation is syntactic and does not prove semantic support. The full solution builds and the five focused hardening tests pass; these do not validate live query behavior or answer quality.
-- Phases 14-17 remain roadmap items in the main README and are not part of this archive request.
+- At the time this report was prepared, Phases 14-17 were broad roadmap items and were not part of this archive request. The later [Phase 14 proposal](../phases/phase14/proposal.md) recommends a revised sequence through Phase 18; it remains a proposal and does not change this report's Phase 12/13 acceptance status.
 
 ## Source and archive coverage
 

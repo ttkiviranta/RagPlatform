@@ -35,6 +35,8 @@ Detailed phase material, completion reports, architecture notes, rollout informa
 - [Phase 13 documentation](docs/phases/phase13/)
   - [Completion report](docs/phases/phase13/completion-report.md)
   - [Acceptance validation plan](docs/phases/phase13/acceptance-validation-plan.md)
+- [Phase 14 proposal](docs/phases/phase14/proposal.md)
+  - [Implementation plan](docs/phases/phase14/implementation-plan.md)
 - [Validation documentation](docs/validation/)
 - [Reports](docs/reports/)
 
@@ -115,4 +117,18 @@ The API includes document CRUD and upload, URL import, document processing/metad
 
 ## Next steps
 
-Complete and record the Phase 12 PostgreSQL/pgvector and isolated Service Bus rollout gates, then complete Phase 13 database, live Foundry, answer-quality, security, and operational acceptance. Phases 14–17 (Copilot Studio integration, GraphRAG, administration, and AI engineering/operations) remain roadmap items rather than current implementation scope.
+Complete and record the Phase 12 PostgreSQL/pgvector and isolated Service Bus rollout gates, then complete Phase 13 database, live Foundry, answer-quality, security, and operational acceptance. The previously identified Phase 14–17 themes (Copilot Studio integration, GraphRAG, administration, and AI engineering/operations) remain roadmap items rather than current implementation scope; the proposed sequencing below is not yet approved.
+
+### Proposed roadmap alignment (not yet approved)
+
+The [Phase 14 proposal](docs/phases/phase14/proposal.md) recommends dedicating Phase 14 to **Adaptive Retrieval and Fallback Strategy**: scoped File First retrieval, corpus-wide Vector RAG, and policy-controlled Model Knowledge/Web Search fallback with explicit provenance. This is a proposed re-sequencing, not an approved change to project scope or implementation status.
+
+To preserve every concept in the earlier roadmap while adding this capability, the proposed sequence is:
+
+- **Phase 14 — Adaptive Retrieval and Fallback Strategy**
+- **Phase 15 — Copilot Studio Integration** (moved from the earlier Phase 14 position)
+- **Phase 16 — GraphRAG**
+- **Phase 17 — Administration**
+- **Phase 18 — AI Engineering and Operations**
+
+This proposal adds Phase 18 rather than dropping or combining the previously listed roadmap themes. Phase 12/13 acceptance remains the prerequisite to implementation and enablement. See the [documentation index](docs/README.md) for the proposal and its roadmap status.
