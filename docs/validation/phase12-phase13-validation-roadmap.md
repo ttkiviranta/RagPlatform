@@ -4,7 +4,7 @@
 
 Both phases are **implementation complete**, but neither has sufficient recorded acceptance evidence for production rollout. Phase 12's document-import worker must remain disabled until PostgreSQL/pgvector and isolated Service Bus validation passes. Phase 13 requires database, live Foundry, authorization, answer-quality, security, and operational evaluation before broad release.
 
-The repository records a successful full solution build and five passing focused Phase 13 hardening tests. Phase 12 implementation builds and a PDF upload/message-publish validation are recorded. Those checks do not prove database-backed processing, live message settlement, answer quality, or production readiness.
+The repository records a successful full solution build and five passing focused Phase 13 hardening tests. Phase 12 implementation builds and a PDF upload/message-publish validation are recorded. Those checks do not prove database-backed processing, live message settlement, answer quality, or production readiness. PG-01 is currently blocked by the workstation's enforced Windows Smart App Control `VerifiedAndReputableDesktop` policy (`0283ac0f-fff1-49ae-ada1-8a933130cad6`), which blocks EF design-time execution and other locally generated .NET applications. No RagPlatform defect has been identified; use an approved .NET execution environment to resume runtime validation.
 
 ## 1. Remaining Phase 12 validation
 
@@ -29,8 +29,8 @@ The repository records a successful full solution build and five passing focused
 
 | Validation | Local only | PostgreSQL + pgvector | Azure AI Foundry | Service Bus / other Azure |
 |---|---|---|---|---|
-| Solution build, deterministic service tests, prompt framing, fallback and telemetry classification | **Yes** | Not required | Fakes suffice for deterministic paths | Not required |
-| Phase 12 parsing/chunking/settlement-policy unit tests with fakes | **Yes** | Not required for unit-level behavior | Not required | Fakes do not validate broker settlement |
+| Solution build, deterministic service tests, prompt framing, fallback and telemetry classification | Yes, on a compatible approved .NET environment; this workstation blocks locally generated .NET execution | Not required | Fakes suffice for deterministic paths | Not required |
+| Phase 12 parsing/chunking/settlement-policy unit tests with fakes | Yes, on a compatible approved .NET environment; this workstation blocks testhost/vstest | Not required for unit-level behavior | Not required | Fakes do not validate broker settlement |
 | Applying migrations, pgvector SQL translation/ranking, vector dimensions, transaction/locking/idempotency | No; local Docker can host the dependency | **Required** | No | No |
 | Database-enforced tenant/document retrieval and conversation isolation, atomic citation persistence/cascade | No; local Docker can host the dependency | **Required** | No | No |
 | Live embedding generation used in the ingestion pipeline and live chat/answer behavior | Fakes can test orchestration only | Usually also needed for persistence/E2E | **Required for live provider validation** | No, except complete import E2E also needs Service Bus |
@@ -39,7 +39,7 @@ The repository records a successful full solution build and five passing focused
 | Full Phase 12 upload-to-message-completion trace | No | **Required** | **Required for configured embedding step** | **Blob Storage and isolated Service Bus required** |
 | Phase 13 end-to-end Q&A over imported corpus | No | **Required** | **Required** | Not intrinsically required if documents are already imported; required only when validating the combined upload-to-answer journey |
 
-The repository's `docker-compose.yml` provides a local PostgreSQL 16/pgvector service, so database integration can be run on a developer machine if Docker and the test configuration are available. That does not make database tests unit tests; they still require a real PostgreSQL/pgvector instance. No local Service Bus or Blob emulator is documented as part of this repository, so use isolated Azure test resources for those integration checks. Live-model tests require a configured non-production Foundry deployment and credentials/identity with least privilege.
+The repository's `docker-compose.yml` provides a local PostgreSQL 16/pgvector service, so database integration can use that dependency when run from a compatible approved .NET environment. The current workstation's App Control policy blocks the application/test hosts, so Docker availability alone does not make tests executable there. Database tests require a real PostgreSQL/pgvector instance. No local Service Bus or Blob emulator is documented as part of this repository, so use isolated Azure test resources for those integration checks. Live-model tests require a configured non-production Foundry deployment and credentials/identity with least privilege. Resource provisioning, test-data preparation, and acceptance-threshold definition can proceed independently, but are not passes for the blocked runtime gates.
 
 ## 4. Recommended execution order
 

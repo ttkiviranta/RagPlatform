@@ -10,10 +10,27 @@
 | 10C | Complete/validated | User A conversation access; User B denied/404; Postman workflow | Archived raw test output is absent |
 | 10D | Complete/validated | Audit events persisted with expected outcomes/targets | Query API, retention/purge, and governance reporting are out of scope |
 | 11 | Complete/validated | Foundry auth, embedding/vector flow, grounded chat, scoping, and audit | Current deployment identifiers and model evaluation data are not archived |
-| 12 | Implementation complete; acceptance and rollout pending | Successful builds and upload/message-publish evidence are documented | PostgreSQL/pgvector integration and isolated Service Bus E2E validation, including settlement/retry/DLQ evidence |
-| 13 | Implementation complete; acceptance pending | Full solution build; five focused prompt/evidence/failure-telemetry tests pass; retrieval and answer telemetry implemented | PostgreSQL/pgvector and live Foundry validation, live prompt-injection evaluation, quality/performance baselines, retention policy, and rollout evidence remain |
+| 12 | Implementation complete; acceptance and rollout pending | Successful builds and upload/message-publish evidence are documented | PG-01 is blocked by workstation Smart App Control; PostgreSQL/pgvector integration and isolated Service Bus E2E validation, including settlement/retry/DLQ evidence, remain |
+| 13 | Implementation complete; acceptance pending | Full solution build; five focused prompt/evidence/failure-telemetry tests pass; retrieval and answer telemetry implemented | Database-backed validation is gated by PG-01; live Foundry, prompt-injection, quality/performance, retention, and rollout evidence also remain |
 
 See the [combined Phase 12-13 validation roadmap](phase12-phase13-validation-roadmap.md) for execution environments, validation order, and production-readiness assessment.
+
+## Current execution blocker
+
+PG-01 is **Blocked**, not failed: the enforced Windows Smart App Control policy is `VerifiedAndReputableDesktop` (`0283ac0f-fff1-49ae-ada1-8a933130cad6`). Code Integrity blocked EF design-time loading, `testhost`, `vstest`, and an independent .NET 10 Hello World application. `SmartAppControlState=On`. The failure occurs before migration execution and there is no evidence of a RagPlatform application defect. See the [PG-01 blocker assessment](blockers/pg01-ef-tooling-blocker.md).
+
+The current workstation cannot be used to execute .NET acceptance tests reliably. A successful build is not runtime or acceptance evidence. PG-02 through PG-05 and database-dependent Phase 13 checks must not be reported as passed until PG-01 runs successfully in an approved .NET execution environment.
+
+## Work that can continue before PG-01
+
+- Prepare the run record, synthetic fixtures, evaluation corpus, acceptance thresholds, reviewer assignments, and evidence templates.
+- Provision and review isolated test resources, identities, permissions, queue/DLQ settings, and monitoring. SB-01 infrastructure preparation can proceed, but worker execution and broker end-to-end acceptance cannot be claimed.
+- Review source, configuration, and rollout/rollback procedures without treating static review as runtime validation.
+- Run independent provider or infrastructure smoke checks only from an approved environment; they do not replace the application-backed acceptance tasks.
+
+The highest-value next activity is to select an approved Windows development VM or runner that permits the required locally compiled .NET workload under its authorized policy, then execute PG-01 first. Do not change application code or weaken the current workstation policy to advance the gate.
+
+**Phase disposition remains: implementation complete; acceptance pending.** Phase 12 rollout remains pending and the worker stays disabled outside isolated validation. Phase 13 remains acceptance-pending; neither phase should be marked accepted or production-ready.
 
 ## Phase 12 required acceptance evidence
 
