@@ -14,11 +14,12 @@ Implementation must remain disabled by default until the current Phase 12/13 acc
 
 - `documentId` optionally selects exactly one existing document the caller is authorized to access. It requests File First only when the document meets the eligibility limits below; otherwise retrieval is constrained to that document. Without `documentId`, retain corpus-wide vector RAG, including for small documents.
 - `fallbackMode` selects a fallback **after** successful retrieval is classified as insufficient; it never bypasses retrieval or changes document scope. Values are `None`, `ModelKnowledge`, and `WebSearch`.
+- `fallbackMode` is the canonical API field. `DocumentOnly`, `DocumentThenModelKnowledge`, and `DocumentThenWeb` are descriptive policy names only; they are not request values.
 - Omitted `fallbackMode` is `None`. `None` preserves abstention when evidence is insufficient. A requested mode is effective only when implemented, enabled by the server, and permitted by tenant policy; the request cannot grant itself permission.
 - Invalid enum values return `400` with a documented validation error. A valid but unavailable or disallowed mode returns a generic `403 FallbackModeNotAllowed` response without disclosing internal policy. Neither case silently selects another mode.
 - The first implementation increment adds the `File` provenance contract, but no fallback is callable. The first fallback implementation is ModelKnowledge; WebSearch is a later increment.
 - Each successful answer has one primary provenance source: `File`, `Document`, `ModelKnowledge`, `WebSearch`, or `None` for abstention. Do not mix sources in one answer. `None` is a successful abstention, not a system-error value; errors remain errors.
-- Citation `sourceType` values are `File`, `Document`, and `Web`. File citations identify the selected document/file without claiming a chunk ID; Document citations retain chunk/document linkage; Web citations map to server-approved provider results.
+- Citation `sourceType` values are `File`, `Document`, and `Web`. File citations identify the selected document version/content hash without claiming a chunk ID; Document citations retain chunk/document linkage; Web citations map to server-approved provider results.
 
 ### Dependency gates
 
@@ -27,7 +28,7 @@ Before implementation is enabled for acceptance:
 1. Run PG-01 on a supported, approved .NET execution environment, using separate disposable fresh and upgrade databases.
 2. Complete Phase 12 database/worker acceptance and Phase 13 database-backed retrieval, authorization, citation, and conversation acceptance.
 3. Freeze and approve evidence-sufficiency methods and baselines for both File First and Phase 13 vector retrieval; fallback triggers cannot be tuned after observing Phase 14 outcomes.
-4. Before Increment 3, select a web-search provider and approve its data handling, licensing/terms, region, and query privacy, including whether any provider page-fetching is in scope. The default for this plan is provider-supplied results only, with no arbitrary page fetching.
+4. Before Increment 3, select a web-search provider and approve its data handling, licensing/terms, region, and query privacy. Phase 14 uses provider-supplied search results only: page fetching, crawling, and arbitrary URL retrieval are explicitly out of scope.
 
 Design review and contract prototyping may proceed before these gates. Production-path implementation and enablement should not.
 
@@ -61,8 +62,9 @@ Design review and contract prototyping may proceed before these gates. Productio
 - Add response fields to `POST /api/rag/query`:
   - `answerSource`
   - nullable `fallbackReason`
+- These API fields are the primary Phase 14 deliverable. Rendering a human-readable source label is the responsibility of API clients; no new UI is included.
 - Add optional request field `documentId` to select one authorized document for File First or document-scoped vector retrieval. Null/omitted means corpus-wide vector retrieval.
-- Add a `sourceType` discriminator to citations while retaining existing document citation fields. File citations identify the document/file and available page/section location, without requiring a chunk ID.
+- Add a `sourceType` discriminator to citations while retaining existing document citation fields. File citations identify the exact document version/content hash and available page/section location, without requiring a chunk ID.
 - Add optional request field `fallbackMode`, accepting `None`, `ModelKnowledge`, or `WebSearch`. In Increment 1, only `None` is available. Invalid values return `400`; a valid but unavailable/disallowed mode returns generic `403 FallbackModeNotAllowed`; neither changes the route or triggers another fallback.
 - Keep fields additive for clients that ignore unknown response properties. Publish enum values and nullability in OpenAPI.
 
@@ -82,7 +84,7 @@ Design review and contract prototyping may proceed before these gates. Productio
 ### Migration requirements
 
 - Add nullable answer-source and fallback-reason fields to persisted assistant-message/provenance records as required by the existing model. Persist `File`, `Document`, and `None` outcomes distinctly.
-- Add a citation source discriminator. Backfill existing citation rows to `Document` only where document/chunk foreign keys prove the source; leave ambiguous historical message provenance unknown/null. File citation snapshots must not require a fabricated chunk ID and should retain the selected document/version reference needed to identify the content that was answered, without storing another full-text copy.
+- Add a citation source discriminator. Backfill existing citation rows to `Document` only where document/chunk foreign keys prove the source; leave ambiguous historical message provenance unknown/null. File citation snapshots must not require a fabricated chunk ID and must retain an immutable version ID or content hash identifying the exact text used, without storing another full-text copy.
 - Add database constraints for allowed values and valid null combinations after data backfill: `File`/`Document` have no fallback reason; `ModelKnowledge`/`WebSearch` and successful `None` abstentions require the defined fallback reason. Keep legacy unknowns nullable. Enforce source/citation compatibility in application validation where cross-table constraints are impractical.
 - Verify fresh and upgrade migrations on PostgreSQL/pgvector with the real EF provider. Do not mark the increment accepted on InMemory/SQLite-only results.
 
@@ -123,7 +125,7 @@ Design review and contract prototyping may proceed before these gates. Productio
 
 - Add an `IWebSearchProvider` boundary and one approved provider implementation after provider, legal/terms, privacy, and region review. This is a later fallback increment; ModelKnowledge remains the first and only fallback implemented in Increment 2.
 - Perform search server-side only. Submit only the minimized user query; never submit retrieved document text, tenant/user identifiers, or conversation history. Because the user's query itself may contain personal or confidential information, document this external data flow, obtain the required tenant/user approval, and apply an approved minimization/redaction policy before enabling WebSearch.
-- Limit result count, snippet/content size, request time, and provider calls. The default design consumes bounded provider-supplied results only; do not fetch arbitrary result URLs or implement unrestricted model-directed browsing. If page fetching is later approved, treat it as separately scoped work with its own SSRF and redirect threat model.
+- Limit result count, snippet/content size, request time, and provider calls. Consume bounded provider-supplied results only. Phase 14 does not fetch result pages, crawl websites, follow result redirects, or retrieve arbitrary URLs; any such capability requires a separate phase/scope and threat-model approval.
 - Treat provider-supplied search results/snippets and metadata as untrusted input. Keep them separate from system/developer instructions.
 - Construct citation metadata server-side from provider results actually supplied to the model. Reject fabricated URLs, unsupported labels, and citations to results omitted by context limits.
 - Keep the feature behind a global disabled-by-default test gate until Increment 4.
@@ -132,16 +134,16 @@ Design review and contract prototyping may proceed before these gates. Productio
 
 - `POST /api/rag/query` accepts `fallbackMode=WebSearch` only when the test gate is enabled.
 - Successful responses use `answerSource=WebSearch`, `fallbackReason=NoSufficientDocumentEvidence`, and citations discriminated as `sourceType=Web`.
-- Web citation fields include provider result ID, title, canonical URL, publisher when supplied, and retrieval time. Do not return or persist arbitrary provider/model-generated URLs.
+- Web citation fields include provider result ID, title, canonical URL, publisher when supplied, and retrieval time. Do not return or persist arbitrary provider/model-generated URLs; validate safe schemes and render citations safely. URLs are citations only and are never fetched in Phase 14.
 - Provider errors remain explicit failures; they do not silently invoke model-knowledge fallback.
 
 ### Acceptance criteria
 
 - Web search is called only after successful authorized File First or vector retrieval is insufficient and the selected mode is permitted.
-- Sufficient document evidence avoids a web call; document-only mode never sends a query externally.
+- Sufficient document evidence avoids a web call; `fallbackMode=None` never sends a query externally.
 - Every returned web citation maps to a result included in the answer context; fabricated or omitted-result labels are rejected.
 - Web queries contain no private corpus content or unnecessary user/tenant/history data.
-- Oversized or unsupported provider results, unsafe citation URL schemes, timeouts, provider throttling, and malformed results are safely rejected/classified. Prove that the application does not fetch result URLs or contact private-network destinations; page fetching and its URL-fetch/redirect SSRF controls are out of scope for this increment.
+- Oversized or unsupported provider results, unsafe citation URL schemes, timeouts, provider throttling, and malformed results are safely rejected/classified. Verify that result URLs are never fetched by the application; page-fetching, crawling, and URL-fetch/redirect SSRF controls are out of scope for this increment.
 - Synthetic prompt-injection content in search results cannot override system policy, disclose secrets/other tenants, or forge citation metadata; test failures remain visible.
 - A frozen web-answer evaluation checks factual support, citation quality, freshness metadata, abstention, latency, availability, and cost.
 
@@ -170,7 +172,7 @@ Design review and contract prototyping may proceed before these gates. Productio
 - Enforce `fallbackMode` as a request to use an already-authorized mode, not a policy mutation.
 - Return an explicit forbidden/disabled response when a caller requests a mode not permitted by tenant/server policy; do not disclose internal policy details.
 - Add any policy administration API only if approved, tenant-scoped, audited, and protected by a dedicated administrator authorization policy. Otherwise keep settings in the existing approved configuration process.
-- Document all modes, outcomes, error responses, notices, and citations in OpenAPI. Existing clients omitting the field remain document-only.
+- Document all modes, outcomes, error responses, notices, and citations in OpenAPI. Existing clients omitting `fallbackMode` retain no-fallback behavior; clients omitting `documentId` retain corpus-wide vector retrieval.
 
 ### Acceptance criteria
 

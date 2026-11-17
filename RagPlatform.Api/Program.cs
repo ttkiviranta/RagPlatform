@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
+using Npgsql;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -265,11 +266,21 @@ if (string.IsNullOrWhiteSpace(connectionString))
     var username = Environment.GetEnvironmentVariable("RAGPOSTGRES_USER") ?? "postgres";
     var password = Environment.GetEnvironmentVariable("RAGPOSTGRES_PASSWORD");
 
-    connectionString = $"Host={host};Port={port};Database={database};Username={username};";
+    var connectionStringBuilder = new NpgsqlConnectionStringBuilder
+    {
+        Host = host,
+        Port = int.Parse(port, System.Globalization.CultureInfo.InvariantCulture),
+        Database = database,
+        Username = username
+    };
+
     if (!string.IsNullOrWhiteSpace(password))
     {
-        connectionString += $"Password={password};";
+        connectionStringBuilder.Password = password;
     }
+
+    // Leave Password unset when no value is supplied, preserving passwordless authentication configurations.
+    connectionString = connectionStringBuilder.ConnectionString;
 }
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>

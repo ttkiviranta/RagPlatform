@@ -16,9 +16,9 @@ Improve the answer experience when the authorized document corpus does not conta
 2. For an explicitly selected, eligible small file, answer from its complete extracted text without invoking chunk/vector retrieval. For ordinary corpus questions, retain the existing authorized vector-RAG path.
 3. Evaluate evidence sufficiency using a calibrated, testable policy; return a grounded answer with citations for the selected retrieval path when sufficient.
 4. If evidence is insufficient, use only the fallback mode permitted by tenant/application policy: web search, model knowledge, or no fallback.
-5. Identify provenance in the response and UI. In the first release, do not silently blend file, document, web, and model-knowledge evidence in one answer.
+5. Return provenance in the API response. API clients are responsible for rendering human-readable source labels; a new UI is not part of this proposal. In the first release, do not silently blend file, document, web, and model-knowledge evidence in one answer.
 
-Keep the existing behavior (`DocumentOnly`) as the compatibility default. A tenant can explicitly enable `DocumentThenWeb` or `DocumentThenModelKnowledge` after privacy, security, and quality review. For factual answers requiring verifiable sources, prefer web results from a configured search provider; use model-knowledge fallback only as an explicit, clearly caveated option. Never fabricate citations for model knowledge.
+Keep the existing no-fallback behavior as the compatibility default. `DocumentOnly`, `DocumentThenModelKnowledge`, and `DocumentThenWeb` are descriptive policy names only; they are not API values. The canonical API field is `fallbackMode`, with values `None`, `ModelKnowledge`, and `WebSearch`. A tenant can permit a fallback only after privacy, security, and quality review. For factual answers requiring verifiable sources, prefer provider-supplied web results; use model-knowledge fallback only as an explicit, clearly caveated option. Never fabricate citations for model knowledge.
 
 ## 2. Roadmap alignment and dependencies
 
@@ -43,7 +43,7 @@ Until these gates pass, use mocks or isolated prototypes only; do not represent 
 - Add policy-controlled fallback to either:
   - **Model knowledge:** answer from the configured model without claiming document grounding or citations.
   - **Web search:** search through a configured server-side provider, ground the answer in returned results, and provide validated web citations.
-- Return machine-readable provenance and fallback reason; present a clear human-readable source label.
+- Return machine-readable provenance and fallback reason through the API. Rendering a human-readable source label is the responsibility of API clients; a new UI is not part of this proposal.
 - Persist provenance with successful conversation turns and citation snapshots when conversation persistence is enabled.
 - Add telemetry for selected path, outcome, duration, and source counts without logging query/document/answer content.
 
@@ -62,7 +62,7 @@ Until these gates pass, use mocks or isolated prototypes only; do not represent 
 | **File First** | For an explicitly selected small file, provide its complete extracted text directly as answer context, bypassing chunk/vector retrieval for that request. | Simple, faithful summaries and questions about a known short file; avoids chunk-boundary loss. | Low query complexity but has a strict context ceiling; file selection and authorization must be explicit. It is not a substitute for corpus-wide semantic search. | Medium | Requires Phase 12 extraction/readiness and Phase 13 authorization, citation, and conversation acceptance. |
 | **Vector RAG (Document)** | Search authorized embedded chunks across the corpus and answer from relevant evidence; otherwise abstain or consider fallback. | Best fit for broad, semantic questions across many files. | Handles larger corpora and targeted context; depends on embeddings, vector index, ranking, chunk quality, and citation validation. | Existing | Phase 13 acceptance required to establish database-backed retrieval, authorization, citations, and quality. |
 | **RAG + model knowledge** | On insufficient document evidence, call the chat model without presenting document context as support. | Better coverage for general facts such as “What is the capital of Finland?” | Moderate complexity; output is not independently sourced, may be stale or hallucinated, and has no verifiable citations. | Medium | Strong Phase 13 dependency for reliable evidence gating and authorization. Can be prototyped separately, but must be evaluated after the RAG baseline. |
-| **RAG + web search** | On insufficient document evidence, search approved public sources and generate an answer from those results. | Better freshness and verifiability; can provide links and publishers. | Adds a provider, data egress, source sanitization, injection, SSRF, latency, cost, and availability concerns. | High | Strong Phase 13 dependency; also requires approval of query privacy, provider terms, source policy, and web citation persistence. |
+| **RAG + web search** | On insufficient document evidence, search approved public sources and generate an answer from provider-supplied results. | Better freshness and verifiability; can provide links and publishers. | Adds provider data egress, source sanitization, prompt-injection and unsafe-link risks, latency, cost, and availability concerns. Phase 14 does not fetch result pages. | High | Strong Phase 13 dependency; also requires approval of query privacy, provider terms, source policy, and web citation persistence. |
 | **Hybrid: RAG first, policy-selected fallback** | Prefer documents; when insufficient, use tenant-approved web search or model knowledge, with explicit provenance. | Best balance of private-corpus answers and broader coverage; clear user choice and trust boundaries. | Highest routing and evaluation complexity, but supports extensibility without conflating sources. | High | Requires accepted Phase 12/13 foundations before broad enablement. Fallback modes can be developed behind a disabled policy and tested independently. |
 
 ## 5. Proposed architecture
@@ -76,7 +76,7 @@ Until these gates pass, use mocks or isolated prototypes only; do not represent 
 5. **Grounded answer:** for sufficient File First evidence, answer from the complete selected file and cite it with provenance `File`. For sufficient vector evidence, answer from bounded authorized chunks and cite them with provenance `Document`.
 6. **Fallback decision:** for `Insufficient`, evaluate tenant policy and the request's allowed fallback choice. If disabled, return the existing insufficient-evidence response. If enabled, invoke exactly one fallback path.
 7. **Model-knowledge fallback:** invoke the configured chat deployment without representing the corpus as supporting evidence. Include a clear caveat and return no document citations.
-8. **Web-search fallback:** call a server-side `IWebSearchProvider` using only the minimized user query; select bounded results, treat result content as untrusted, and pass those results to the model as explicitly untrusted web evidence. Server-map citations only to results actually supplied to the model.
+8. **Web-search fallback:** call a server-side `IWebSearchProvider` using only the minimized user query; select bounded provider-supplied results, treat result content as untrusted, and pass those results to the model as explicitly untrusted web evidence. Server-map citations only to results actually supplied to the model. Phase 14 does not fetch result pages, crawl websites, or retrieve arbitrary URLs.
 9. **Failures:** do not invoke fallback for authentication/authorization denials, database/retrieval errors, timeout, provider failures, or invalid citation output. Return the existing explicit error behavior and failure telemetry.
 10. **Persistence and telemetry:** persist the answer, source type, fallback reason, and source snapshots atomically with a successful conversation turn. Record outcome metadata only; do not log prompt, query, excerpts, or answer text.
 
@@ -87,8 +87,8 @@ File First is a scoped optimization, not a global replacement for vector search.
 Initial thresholds for an isolated evaluation (not production defaults until validated):
 
 - **One selected file per request.** The caller explicitly supplies an authorized document ID; multiple-file synthesis is out of scope for the first release.
-- **Small-file ceiling:** no more than **4,000 tokens** of canonical extracted text and no more than **24 KiB UTF-8** of that text; whichever limit is reached first excludes the file from File First.
-- **Prompt ceiling:** reserve at most **8,000 tokens** total for the selected file, system instructions, question, and answer budget. Count with the configured model's tokenizer before invocation; reject the File First route rather than silently truncating the file if the budget cannot be met.
+- **Small-file ceiling:** no more than **4,000 tokens** of canonical extracted text, counted with the configured deployment's tokenizer, and no more than **24 KiB UTF-8** of that text; whichever limit is reached first excludes the file from File First.
+- **Prompt ceiling:** reserve at most **8,000 tokens** total for the selected file, system instructions, question, and answer budget. Count with the configured deployment's tokenizer before invocation; if counting is unavailable or the full prompt exceeds the ceiling, do not truncate and use document-scoped vector retrieval instead.
 - Count normalized extracted text, not the uploaded PDF/DOCX/binary size. Apply independent existing upload/extraction limits before this routing decision.
 - If a selected file exceeds either small-file limit, use vector retrieval constrained to that document, if supported; otherwise return the established validation response. Never send an oversized full file as a fallback to File First.
 - Revisit these starting values using representative short-file summaries, question-answer quality, latency, and token-cost measurements before enabling the route beyond a test tenant.
@@ -98,14 +98,14 @@ This proposal bypasses **chunk/vector retrieval at query time** for eligible, ex
 ### Trust and source separation
 
 - A response has one primary source mode in the MVP: `File`, `Document`, `WebSearch`, `ModelKnowledge`, or `None` (abstention). `File` means the complete extracted text of one explicitly selected file was supplied as context; `Document` means vector-retrieved document chunks were supplied. Do not label an answer `Hybrid` if its claims cannot be traced to individual source types.
-- File citations reference the authorized document and file metadata, with page/section location when extraction provides it; they do not claim chunk-level provenance. Document citations reference authorized persisted chunk/document records.
+- File citations reference the authorized document and the exact immutable document version (or content hash) used to generate the answer, with page/section location when extraction provides it; they do not claim chunk-level provenance. Document citations reference authorized persisted chunk/document records.
 - Web citations reference provider result IDs and canonical URLs, titles, publishers where available, and retrieval time. The server—not the model—constructs citation metadata.
 - Model-knowledge answers have no citations and carry a prominent “model knowledge; not verified against your documents” notice.
 - If future requirements need source mixing, add claim-level provenance and a separate evaluation gate rather than combining sources invisibly.
 
 ## 6. API and data contracts
 
-Keep `POST /api/rag/query` as the entry point. Add optional, backward-compatible request selection; a missing field preserves current document-only behavior. The caller may request only modes enabled by the tenant/server policy.
+Keep `POST /api/rag/query` as the entry point. Add optional, backward-compatible request selection; omitted `fallbackMode` means `None` and preserves no-fallback behavior. The caller may request only modes enabled by the tenant/server policy. Provenance and fallback fields in the API are the primary deliverable; clients decide how to render source labels.
 
 ### Proposed request addition
 
@@ -118,7 +118,7 @@ Keep `POST /api/rag/query` as the entry point. Add optional, backward-compatible
 }
 ```
 
-`documentId` is optional and identifies one existing document that the caller is authorized to access; it is not a file path or storage URL. When supplied and eligible, it requests File First; an oversized document uses vector retrieval constrained to that document. When omitted, the request uses corpus-wide vector RAG as today. `fallbackMode` is an enum: `None`, `ModelKnowledge`, or `WebSearch`. It is not a URL, provider endpoint, or free-form tool instruction. The effective mode is the intersection of the request, tenant policy, and server capabilities. Default: `None` for existing clients and tenants until explicitly enabled.
+`documentId` is optional and identifies one existing document that the caller is authorized to access; it is not a file path or storage URL. When supplied and eligible, it requests File First; an oversized document uses vector retrieval constrained to that document. When omitted, the request uses corpus-wide vector RAG as today. `fallbackMode` is the canonical API field and accepts `None`, `ModelKnowledge`, or `WebSearch`; it is not a URL, provider endpoint, or free-form tool instruction. `DocumentOnly`, `DocumentThenModelKnowledge`, and `DocumentThenWeb` are policy descriptions only, not request values. Invalid enum values return `400`; a valid but unavailable or disallowed mode returns generic `403 FallbackModeNotAllowed`. The effective mode is the intersection of the request, tenant policy, and server capabilities. Default: `None` for existing clients and tenants until explicitly enabled.
 
 ### Proposed response additions
 
@@ -140,11 +140,11 @@ Keep `POST /api/rag/query` as the entry point. Add optional, backward-compatible
 }
 ```
 
-For a `File` answer, return `answerSource: "File"` and a citation identifying the selected document/file, without a chunk ID unless the citation contract separately has one. For a `Document` answer, retain existing document citation fields and identify the source type. `answerSource` values are `File`, `Document`, `ModelKnowledge`, `WebSearch`, and `None`; citation `sourceType` distinguishes `File`, `Document`, and `Web`. For `ModelKnowledge`, return `answerSource: "ModelKnowledge"`, an explicit caveat, and no fabricated citations. For abstention, return `answerSource: "None"`, a stable outcome/fallback reason, and no citations.
+For a `File` answer, return `answerSource: "File"` and a citation identifying the selected document and the exact version/content hash used, without a chunk ID unless the citation contract separately has one. For a `Document` answer, retain existing document citation fields and identify the source type. `answerSource` values are `File`, `Document`, `ModelKnowledge`, `WebSearch`, and `None`; citation `sourceType` distinguishes `File`, `Document`, and `Web`. For `ModelKnowledge`, return `answerSource: "ModelKnowledge"`, an explicit caveat, and no fabricated citations. For abstention, return `answerSource: "None"`, a stable outcome/fallback reason, and no citations.
 
 ### Persistence and compatibility
 
-- Extend citation/provenance snapshots with a source discriminator and the minimum safe metadata required to render the source. File snapshots identify the document/file without requiring a chunk ID; vector Document snapshots remain tied to persisted document/chunk IDs; web snapshots should not store full pages by default.
+- Extend citation/provenance snapshots with a source discriminator and the minimum safe metadata required to render the source. File snapshots identify the exact document version/content hash without requiring a chunk ID; vector Document snapshots remain tied to persisted document/chunk IDs; web snapshots should not store full pages by default.
 - Add a migration for the new metadata and preserve existing conversation-history behavior. Review retention/deletion semantics for external web citation snapshots.
 - Keep existing clients working when they omit `fallbackMode`; document any new response properties and enum values in OpenAPI.
 - Avoid persisting a partial conversation turn when fallback generation, citation validation, or provenance persistence fails.
@@ -152,10 +152,10 @@ For a `File` answer, return `answerSource: "File"` and a citation identifying th
 ## 7. Security, privacy, and operations
 
 - **Authorization first:** run existing tenant/owner/document checks before using corpus context. A fallback must not reveal that inaccessible documents exist or their contents.
-- **File scope:** validate access to `documentId` before loading extracted text. Apply existing tenant/owner rules and the same content retention/deletion policy; do not resolve caller-supplied paths or storage URLs.
+- **File scope:** validate access to `documentId` before loading the requested version's extracted text. Apply existing tenant/owner rules and the same content retention/deletion policy; do not resolve caller-supplied paths or storage URLs.
 - **No error masking:** fallback is only for a successful retrieval classified as insufficient; never convert an authorization, database, Foundry, or search-provider failure into a plausible answer.
-- **Web query privacy:** web search sends information outside the platform. Minimize the query; do not send retrieved document text, tenant/user identifiers, conversation history, or private metadata. Require tenant-level approval/enablement and document the provider's data handling and retention terms.
-- **Safe web access:** use a trusted server-side search provider, not arbitrary URL fetches. Enforce destination/redirect validation, private-network and metadata-service protections, timeouts, response-size/content-type limits, and rate limits.
+- **Web query privacy:** web search sends information outside the platform, and the user's question may itself contain personal or confidential information. Minimize and, where required, redact the query; do not send retrieved document text, tenant/user identifiers, conversation history, or private metadata. Document this data flow, obtain the required tenant/user approval, and review provider data handling and retention terms before enabling WebSearch.
+- **Web retrieval boundary:** Phase 14 uses only bounded, provider-supplied search results. It does not fetch result pages, crawl websites, follow result redirects, or retrieve arbitrary URLs. Validate citation URLs for safe schemes and rendering; any future page fetching requires a separate scope and threat-model approval.
 - **Untrusted content:** treat web pages and uploaded documents as untrusted instructions. Keep them out of system/developer instructions; test prompt injection and citation forgery against both source types.
 - **Citation integrity:** accept only server-issued result labels/IDs supplied to the model; reject unsupported labels and fabricated URLs. A valid citation link is not proof of semantic entailment; evaluate support separately.
 - **Model knowledge:** mark it as unverified, avoid authoritative/legal/medical/financial claims without configured restrictions, and do not manufacture a source list.
@@ -176,9 +176,9 @@ Phase 14 is accepted only when the following pass on the accepted Phase 12/13 fo
 8. **Authorization isolation:** cross-tenant/owner tests show unauthorized full-file text or chunks never reach model context, fallback query, response, citations, conversation storage, or logs.
 9. **Privacy and injection:** synthetic malicious document/web content cannot override system policy, disclose secrets/other tenants, or forge source metadata; web queries contain no private corpus content or unnecessary identity/history data.
 10. **Conversation integrity:** successful answer and provenance snapshots persist atomically; failed requests create no partial turn; owner/tenant access and deletion behavior remain correct.
-11. **Quality and user clarity:** a frozen evaluation set measures File First routing eligibility, vector retrieval sufficiency, answer correctness, citation support, abstention, and user-visible provenance; thresholds are pre-approved and met.
+11. **Quality and user clarity:** a frozen evaluation set measures File First routing eligibility, vector retrieval sufficiency, answer correctness, citation support, and abstention; thresholds are pre-approved and met. API provenance fields and notices are stable and documented for clients to render; implementing a UI is out of scope.
 12. **Operations:** telemetry is content-free; source-mode latency, failures, abstentions, token/search cost, quotas, alerts, and kill-switch behavior are demonstrated. Record p50/p95/p99 and agreed cost/error thresholds.
-13. **Compatibility:** existing clients that omit `documentId` and `fallbackMode` retain document-only vector behavior and the documented response contract.
+13. **Compatibility:** existing clients that omit `documentId` and `fallbackMode` retain corpus-wide vector retrieval with no fallback and the documented response contract.
 
 ## 9. Recommended delivery sequence
 
@@ -187,7 +187,7 @@ Phase 14 is accepted only when the following pass on the accepted Phase 12/13 fo
 3. Establish the Phase 13 quality baseline and evidence-sufficiency criteria before adding fallback routing.
 4. Deliver the backward-compatible provenance contract and deterministic routing tests, including the explicitly scoped File First path and its size/token gates.
 5. Add policy-controlled model-knowledge fallback and evaluate it separately from File and Document answers.
-6. Add web search only after privacy/provider review, safe-fetch design, citation snapshots, and threat-model approval.
+6. Add WebSearch only after privacy/provider review, provider-result handling, citation snapshots, and threat-model approval. Phase 14 does not include page fetching or crawling.
 7. Enable the feature only for an isolated test tenant; expand after all security, quality, cost, and operational gates pass.
 
 ## 10. Recommendation
@@ -196,4 +196,3 @@ Subject to project-owner approval of the roadmap re-sequencing, adopt the **hybr
 
 Because Phase 12/13 acceptance is pending and PG-01 has no approved alternate execution environment yet, approve the proposal and API/security design now, but defer production-path implementation and enablement until the existing RAG, authorization, citation, and database acceptance gates can be completed.
 
-The linked [implementation plan](implementation-plan.md) predates this File First extension. If this extension is approved, update that plan's provenance contract, routing increment, persistence requirements, and acceptance gates before implementation begins.
