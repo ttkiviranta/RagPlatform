@@ -190,7 +190,13 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddHttpClient("WebContentClient", client =>
 {
     client.Timeout = TimeSpan.FromSeconds(30);
-    client.DefaultRequestHeaders.Accept.ParseAdd("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+    client.DefaultRequestHeaders.Accept.ParseAdd("text/html,application/xhtml+xml,application/xml;q=0.9");
+})
+.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+{
+    AllowAutoRedirect = false,
+    UseProxy = false,
+    ConnectCallback = WebContentDestinationPolicy.ConnectAsync
 });
 builder.Services.AddSwaggerGen(options =>
 {

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Net;
 using HtmlAgilityPack;
 using RagPlatform.Api.Contracts.Audit;
 using RagPlatform.Api.Contracts.Authorization;
@@ -11,6 +12,15 @@ namespace RagPlatform.Api.Services;
 
 public sealed class WebContentService : IWebContentService
 {
+    private const int MaximumResponseBytes = 5 * 1024 * 1024;
+    private const int MaximumRedirects = 5;
+    private static readonly HashSet<string> SupportedContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "text/html",
+        "application/xhtml+xml",
+        "application/xml"
+    };
+
     private readonly ApplicationDbContext _dbContext;
     private readonly IDocumentAccessService _documentAccessService;
     private readonly IAuditEventWriter _auditEventWriter;
@@ -45,30 +55,167 @@ public sealed class WebContentService : IWebContentService
             throw new ArgumentException("A valid HTTP or HTTPS URL is required.", nameof(url));
         }
 
+        WebContentDestinationPolicy.ValidateUri(uri, nameof(url));
+
         var user = await _documentAccessService.GetRequiredCurrentUserAsync(cancellationToken);
         var client = _httpClientFactory.CreateClient("WebContentClient");
 
-        using var response = await client.GetAsync(uri, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        var currentUri = uri;
+        var visitedUris = new HashSet<string>(StringComparer.Ordinal)
         {
-            throw new HttpRequestException($"Unable to fetch the page. Status code: {(int)response.StatusCode}.");
+            GetRedirectLoopKey(uri)
+        };
+
+        for (var redirectCount = 0; ; redirectCount++)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, currentUri);
+            using var response = await client.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+
+            if (IsRedirect(response.StatusCode))
+            {
+                if (redirectCount >= MaximumRedirects)
+                {
+                    throw new HttpRequestException($"The remote page exceeded the {MaximumRedirects}-redirect limit.");
+                }
+
+                if (response.Headers.Location is null)
+                {
+                    throw new HttpRequestException("The remote page returned a redirect without a destination.");
+                }
+
+                Uri redirectUri;
+                try
+                {
+                    redirectUri = response.Headers.Location.IsAbsoluteUri
+                        ? response.Headers.Location
+                        : new Uri(currentUri, response.Headers.Location);
+                    WebContentDestinationPolicy.ValidateUri(redirectUri, nameof(url));
+                }
+                catch (ArgumentException exception)
+                {
+                    throw new HttpRequestException("The remote page redirected to a disallowed destination.", exception);
+                }
+                catch (UriFormatException exception)
+                {
+                    throw new HttpRequestException("The remote page returned an invalid redirect destination.", exception);
+                }
+
+                if (currentUri.Scheme == Uri.UriSchemeHttps && redirectUri.Scheme == Uri.UriSchemeHttp)
+                {
+                    throw new HttpRequestException("HTTPS-to-HTTP redirects are not allowed.");
+                }
+
+                if (!visitedUris.Add(GetRedirectLoopKey(redirectUri)))
+                {
+                    throw new HttpRequestException("The remote page returned a redirect loop.");
+                }
+
+                currentUri = redirectUri;
+                continue;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException($"Unable to fetch the page. Status code: {(int)response.StatusCode}.");
+            }
+
+            var contentType = response.Content.Headers.ContentType?.MediaType;
+            if (contentType is null)
+            {
+                throw new HttpRequestException("The remote page did not include a Content-Type header.");
+            }
+
+            if (!SupportedContentTypes.Contains(contentType))
+            {
+                throw new HttpRequestException("The remote page returned an unsupported content type.");
+            }
+
+            var responseBytes = await ReadResponseBytesAsync(response.Content, cancellationToken);
+            var html = DecodeResponse(responseBytes, response.Content.Headers.ContentType?.CharSet);
+            var document = BuildDocument(uri, html);
+            document.OwnerUserId = user.Id;
+            document.TenantId = user.TenantId;
+
+            _dbContext.Documents.Add(document);
+            _auditEventWriter.Add(user.Id, user.TenantId, AuditEventTypes.DocumentCreated, "Succeeded", "Document", document.Id.ToString());
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation(
+                "Imported web content from {SourceUrl} into document {DocumentId}.",
+                uri,
+                document.Id);
+
+            return document;
+        }
+    }
+
+    private static bool IsRedirect(HttpStatusCode statusCode)
+    {
+        return statusCode is HttpStatusCode.MultipleChoices
+            or HttpStatusCode.MovedPermanently
+            or HttpStatusCode.Found
+            or HttpStatusCode.SeeOther
+            or HttpStatusCode.TemporaryRedirect
+            or HttpStatusCode.PermanentRedirect;
+    }
+
+    private static string GetRedirectLoopKey(Uri uri)
+    {
+        return new UriBuilder(uri) { Fragment = string.Empty }.Uri.AbsoluteUri;
+    }
+
+    private static async Task<byte[]> ReadResponseBytesAsync(HttpContent content, CancellationToken cancellationToken)
+    {
+        if (content.Headers.ContentLength > MaximumResponseBytes)
+        {
+            throw new HttpRequestException($"The remote page exceeded the {MaximumResponseBytes}-byte response limit.");
         }
 
-        var html = await response.Content.ReadAsStringAsync(cancellationToken);
-        var document = BuildDocument(uri, html);
-        document.OwnerUserId = user.Id;
-        document.TenantId = user.TenantId;
+        await using var responseStream = await content.ReadAsStreamAsync(cancellationToken);
+        using var buffer = new MemoryStream();
+        var readBuffer = new byte[81920];
 
-        _dbContext.Documents.Add(document);
-        _auditEventWriter.Add(user.Id, user.TenantId, AuditEventTypes.DocumentCreated, "Succeeded", "Document", document.Id.ToString());
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        while (true)
+        {
+            var bytesRemaining = MaximumResponseBytes - (int)buffer.Length;
+            var bytesToRead = Math.Min(readBuffer.Length, bytesRemaining + 1);
+            var bytesRead = await responseStream.ReadAsync(readBuffer.AsMemory(0, bytesToRead), cancellationToken);
+            if (bytesRead == 0)
+            {
+                break;
+            }
 
-        _logger.LogInformation(
-            "Imported web content from {SourceUrl} into document {DocumentId}.",
-            uri,
-            document.Id);
+            if (bytesRead > bytesRemaining)
+            {
+                throw new HttpRequestException($"The remote page exceeded the {MaximumResponseBytes}-byte response limit.");
+            }
 
-        return document;
+            await buffer.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken);
+        }
+
+        return buffer.ToArray();
+    }
+
+    private static string DecodeResponse(byte[] responseBytes, string? characterSet)
+    {
+        Encoding encoding;
+        try
+        {
+            encoding = string.IsNullOrWhiteSpace(characterSet)
+                ? Encoding.UTF8
+                : Encoding.GetEncoding(characterSet.Trim('"'));
+        }
+        catch (ArgumentException exception)
+        {
+            throw new HttpRequestException("The remote page declared an unsupported character encoding.", exception);
+        }
+
+        using var stream = new MemoryStream(responseBytes, writable: false);
+        using var reader = new StreamReader(stream, encoding, detectEncodingFromByteOrderMarks: true);
+        return reader.ReadToEnd();
     }
 
     private static Document BuildDocument(Uri uri, string html)

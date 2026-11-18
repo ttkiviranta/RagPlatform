@@ -65,4 +65,4 @@ The client advertises acceptable HTML media types, but the service does not veri
 
 ## Decision status
 
-**Not yet fixed.** The review identified risks and recommended mitigations only. No application code changes or patches were made as part of this assessment.
+**Implemented; runtime tests pending.** The URL import path now validates destinations and redirects, enforces a 5 MiB streamed response limit, and accepts only `text/html`, `application/xhtml+xml`, and `application/xml`. A missing `Content-Type` is explicitly rejected. The dedicated client bypasses system proxies so the connection-time destination check applies to the origin; environments requiring an outbound proxy must provide equivalent network-level restrictions or will need a proxy-compatible validated egress path. The API and test projects build successfully. Focused test execution is still pending because Smart App Control blocked test assembly loading on the local workstation. The original findings above describe the state at the time of the assessment.
