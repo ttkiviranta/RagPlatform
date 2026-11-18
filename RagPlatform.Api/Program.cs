@@ -12,7 +12,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
-using Npgsql;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -263,31 +262,7 @@ builder.Services.AddOpenTelemetry()
         }
     });
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-if (string.IsNullOrWhiteSpace(connectionString))
-{
-    var host = Environment.GetEnvironmentVariable("RAGPOSTGRES_HOST") ?? "localhost";
-    var port = Environment.GetEnvironmentVariable("RAGPOSTGRES_PORT") ?? "5432";
-    var database = Environment.GetEnvironmentVariable("RAGPOSTGRES_DB") ?? "ragplatform";
-    var username = Environment.GetEnvironmentVariable("RAGPOSTGRES_USER") ?? "postgres";
-    var password = Environment.GetEnvironmentVariable("RAGPOSTGRES_PASSWORD");
-
-    var connectionStringBuilder = new NpgsqlConnectionStringBuilder
-    {
-        Host = host,
-        Port = int.Parse(port, System.Globalization.CultureInfo.InvariantCulture),
-        Database = database,
-        Username = username
-    };
-
-    if (!string.IsNullOrWhiteSpace(password))
-    {
-        connectionStringBuilder.Password = password;
-    }
-
-    // Leave Password unset when no value is supplied, preserving passwordless authentication configurations.
-    connectionString = connectionStringBuilder.ConnectionString;
-}
+var connectionString = PostgreSqlConnectionStringResolver.Resolve(builder.Configuration);
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString, npgsqlOptions => npgsqlOptions.UseVector()));
