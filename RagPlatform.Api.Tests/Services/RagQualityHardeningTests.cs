@@ -9,6 +9,7 @@ using RagPlatform.Api.Services;
 namespace RagPlatform.Api.Tests.Services;
 
 [TestClass]
+[TestCategory("Unit")]
 public sealed class RagQualityHardeningTests
 {
     [TestMethod]

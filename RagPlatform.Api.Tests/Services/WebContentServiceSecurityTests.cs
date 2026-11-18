@@ -12,11 +12,13 @@ using RagPlatform.Api.Services;
 namespace RagPlatform.Api.Tests.Services;
 
 [TestClass]
-public sealed class WebContentServiceSecurityTests
+[DoNotParallelize]
+public sealed class WebContentServiceSecurityTests : PostgreSqlTestClassBase
 {
     private const int MaximumResponseBytes = 5 * 1024 * 1024;
 
     [TestMethod]
+    [TestCategory("Unit")]
     [DataRow("0.1.2.3")]
     [DataRow("10.1.2.3")]
     [DataRow("100.64.0.1")]
@@ -40,6 +42,7 @@ public sealed class WebContentServiceSecurityTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     [DataRow("8.8.8.8")]
     [DataRow("2606:4700:4700::1111")]
     public void IsPublicAddress_PublicAddress_ReturnsTrue(string address)
@@ -48,6 +51,7 @@ public sealed class WebContentServiceSecurityTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     [DataRow("https://user:password@example.com/")]
     [DataRow("http://example.com:8080/")]
     [DataRow("https://example.com:80/")]
@@ -60,6 +64,7 @@ public sealed class WebContentServiceSecurityTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     [DataRow("https://example.com/")]
     [DataRow("http://example.com/")]
     public void ValidateUri_PublicHttpDestination_IsAllowed(string value)
@@ -68,6 +73,7 @@ public sealed class WebContentServiceSecurityTests
     }
 
     [TestMethod]
+    [TestCategory("PostgreSql")]
     public async Task ImportAsync_ValidHtml_PersistsDocumentAndPreservesSourceUrl()
     {
         var fixture = CreateFixture(_ => Task.FromResult(CreateHtmlResponse("text/html; charset=utf-8")));
@@ -85,6 +91,7 @@ public sealed class WebContentServiceSecurityTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task ImportAsync_LoopbackLiteral_IsRejectedBeforeSendingRequest()
     {
         var fixture = CreateFixture(_ => Task.FromResult(CreateHtmlResponse("text/html")));
@@ -98,6 +105,7 @@ public sealed class WebContentServiceSecurityTests
     }
 
     [TestMethod]
+    [TestCategory("PostgreSql")]
     public async Task ImportAsync_FollowsPublicRedirect_AndKeepsOriginalSourceUrl()
     {
         var fixture = CreateFixture(request =>
@@ -122,6 +130,7 @@ public sealed class WebContentServiceSecurityTests
     }
 
     [TestMethod]
+    [TestCategory("PostgreSql")]
     public async Task ImportAsync_ResponseAtSizeLimit_IsAccepted()
     {
         const string prefix = "<html><body><main>Content";
@@ -144,6 +153,7 @@ public sealed class WebContentServiceSecurityTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task ImportAsync_RedirectsToPrivateDestination_RejectsBeforeSecondRequest()
     {
         var fixture = CreateFixture(_ => Task.FromResult(
@@ -158,6 +168,7 @@ public sealed class WebContentServiceSecurityTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task ImportAsync_HttpsRedirectToHttp_RejectsDowngrade()
     {
         var fixture = CreateFixture(_ => Task.FromResult(
@@ -172,6 +183,7 @@ public sealed class WebContentServiceSecurityTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task ImportAsync_RedirectLoop_RejectsRepeatedDestination()
     {
         var fixture = CreateFixture(request => Task.FromResult(
@@ -187,6 +199,7 @@ public sealed class WebContentServiceSecurityTests
     }
 
     [TestMethod]
+    [TestCategory("PostgreSql")]
     public async Task ImportAsync_FiveRedirects_AreAllowed()
     {
         var fixture = CreateFixture(request =>
@@ -205,6 +218,7 @@ public sealed class WebContentServiceSecurityTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task ImportAsync_MoreThanFiveRedirects_AreRejected()
     {
         var fixture = CreateFixture(request =>
@@ -222,6 +236,7 @@ public sealed class WebContentServiceSecurityTests
     }
 
     [TestMethod]
+    [TestCategory("PostgreSql")]
     [DataRow("text/html")]
     [DataRow("application/xhtml+xml")]
     [DataRow("application/xml")]
@@ -237,6 +252,7 @@ public sealed class WebContentServiceSecurityTests
     }
 
     [TestMethod]
+    [TestCategory("PostgreSql")]
     public async Task ImportAsync_UnsupportedContentType_IsRejected()
     {
         var fixture = CreateFixture(_ => Task.FromResult(CreateHtmlResponse("application/pdf")));
@@ -250,6 +266,7 @@ public sealed class WebContentServiceSecurityTests
     }
 
     [TestMethod]
+    [TestCategory("PostgreSql")]
     public async Task ImportAsync_MissingContentType_IsRejectedWithExplicitError()
     {
         var fixture = CreateFixture(_ => Task.FromResult(CreateHtmlResponse(null)));
@@ -264,6 +281,7 @@ public sealed class WebContentServiceSecurityTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task ImportAsync_ResponseExceedingContentLengthLimit_IsRejected()
     {
         var content = new ByteArrayContent(new byte[MaximumResponseBytes + 1]);
@@ -277,6 +295,7 @@ public sealed class WebContentServiceSecurityTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task ImportAsync_StreamingResponseWithoutContentLength_EnforcesLimit()
     {
         var body = new byte[MaximumResponseBytes + 1];
@@ -297,10 +316,7 @@ public sealed class WebContentServiceSecurityTests
     {
         var handler = new StubHttpMessageHandler(send);
         var httpClient = new HttpClient(handler);
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-        var dbContext = new ApplicationDbContext(options);
+        var dbContext = new ApplicationDbContext(TestDbContextOptions.Create());
         var user = new User { TenantId = "tenant-a" };
         var service = new WebContentService(
             dbContext,

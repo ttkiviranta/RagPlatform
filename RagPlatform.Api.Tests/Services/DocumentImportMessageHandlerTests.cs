@@ -10,11 +10,13 @@ using RagPlatform.Api.Services;
 namespace RagPlatform.Api.Tests.Services;
 
 [TestClass]
-public sealed class DocumentImportMessageHandlerTests
+[DoNotParallelize]
+public sealed class DocumentImportMessageHandlerTests : PostgreSqlTestClassBase
 {
     private static readonly JsonSerializerOptions MessageJsonOptions = new(JsonSerializerDefaults.Web);
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task HandleAsync_RejectsEmptyBody()
     {
         using var dbContext = CreateDbContext();
@@ -27,6 +29,7 @@ public sealed class DocumentImportMessageHandlerTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task HandleAsync_RejectsMalformedJson()
     {
         using var dbContext = CreateDbContext();
@@ -40,6 +43,7 @@ public sealed class DocumentImportMessageHandlerTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task HandleAsync_RejectsMessageWithMissingRequiredFields()
     {
         using var dbContext = CreateDbContext();
@@ -53,6 +57,7 @@ public sealed class DocumentImportMessageHandlerTests
     }
 
     [TestMethod]
+    [TestCategory("PostgreSql")]
     public async Task HandleAsync_RejectsMessageForMissingDocument()
     {
         using var dbContext = CreateDbContext();
@@ -66,6 +71,7 @@ public sealed class DocumentImportMessageHandlerTests
     }
 
     [TestMethod]
+    [TestCategory("PostgreSql")]
     [DataRow("Tenant")]
     [DataRow("Owner")]
     [DataRow("StagingBlobKey")]
@@ -94,6 +100,7 @@ public sealed class DocumentImportMessageHandlerTests
     }
 
     [TestMethod]
+    [TestCategory("PostgreSql")]
     public async Task HandleAsync_MatchingMessageTransitionsQueuedDocumentAndAddsAuditEvent()
     {
         using var dbContext = CreateDbContext();
@@ -116,10 +123,7 @@ public sealed class DocumentImportMessageHandlerTests
 
     private static ApplicationDbContext CreateDbContext()
     {
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-        return new ApplicationDbContext(options);
+        return new ApplicationDbContext(TestDbContextOptions.Create());
     }
 
     private static DocumentImportMessageHandler CreateHandler(ApplicationDbContext dbContext)

@@ -9,6 +9,7 @@ using RagPlatform.Api.Data;
 namespace RagPlatform.Api.Tests.Services;
 
 [TestClass]
+[TestCategory("Unit")]
 [DoNotParallelize]
 public sealed class PostgreSqlConnectionStringConfigurationTests
 {

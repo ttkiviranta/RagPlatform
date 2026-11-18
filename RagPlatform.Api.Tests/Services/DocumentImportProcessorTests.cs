@@ -17,7 +17,9 @@ using RagPlatform.Api.Services;
 namespace RagPlatform.Api.Tests.Services;
 
 [TestClass]
-public sealed class DocumentImportProcessorTests
+[TestCategory("PostgreSql")]
+[DoNotParallelize]
+public sealed class DocumentImportProcessorTests : PostgreSqlTestClassBase
 {
     [TestMethod]
     public async Task ProcessAsync_PersistsExtractedTextAndSkipsRedelivery()
@@ -388,10 +390,7 @@ public sealed class DocumentImportProcessorTests
 
     private static ApplicationDbContext CreateDbContext(string databaseName)
     {
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(databaseName)
-            .Options;
-        return new ApplicationDbContext(options);
+        return new ApplicationDbContext(TestDbContextOptions.Create(databaseName));
     }
 
     private static DocumentImportProcessor CreateProcessor(

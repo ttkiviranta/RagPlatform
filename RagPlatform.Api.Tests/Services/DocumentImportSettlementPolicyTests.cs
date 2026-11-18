@@ -8,7 +8,9 @@ using RagPlatform.Api.Services;
 namespace RagPlatform.Api.Tests.Services;
 
 [TestClass]
-public sealed class DocumentImportSettlementPolicyTests
+[TestCategory("PostgreSql")]
+[DoNotParallelize]
+public sealed class DocumentImportSettlementPolicyTests : PostgreSqlTestClassBase
 {
     [TestMethod]
     public async Task DecideAsync_AfterSuccessfulProcessing_DefersSettlement()
@@ -138,10 +140,7 @@ public sealed class DocumentImportSettlementPolicyTests
 
     private static ApplicationDbContext CreateDbContext()
     {
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-        return new ApplicationDbContext(options);
+        return new ApplicationDbContext(TestDbContextOptions.Create());
     }
 
     private static Document CreateDocument(DocumentImportStatus status)

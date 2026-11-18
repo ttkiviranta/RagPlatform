@@ -1,0 +1,77 @@
+name: PostgreSQL Integration
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: postgres-integration-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=ragplatform_ci;Username=postgres;Password=ci-only-password
+      RAGPLATFORM_TEST_POSTGRES_CONNECTION: Host=localhost;Port=5432;Database=ragplatform_ci;Username=postgres;Password=ci-only-password
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: ragplatform_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ragplatform_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
+
+      - name: Restore solution
+        run: dotnet restore RagPlatform.slnx
+
+      - name: Restore local tools
+        run: dotnet tool restore
+
+      - name: Build solution
+        run: dotnet build RagPlatform.slnx --configuration Release --no-restore
+
+      - name: Apply database migrations
+        run: dotnet ef database update --project RagPlatform.Api/RagPlatform.Api.csproj --startup-project RagPlatform.Api/RagPlatform.Api.csproj --configuration Release
+
+      - name: Run PostgreSQL integration tests
+        run: dotnet test RagPlatform.Api.Tests/RagPlatform.Api.Tests.csproj --configuration Release --no-build --filter "TestCategory=PostgreSql" --logger "trx;LogFileName=postgres-integration.trx" --results-directory TestResults
+
+      - name: Publish test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: postgres-integration-test-results
+          path: TestResults/**/*.trx
+          if-no-files-found: warn
+          retention-days: 14

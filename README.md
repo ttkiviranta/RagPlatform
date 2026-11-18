@@ -105,14 +105,20 @@ dotnet run --project RagPlatform.Api
 
 Use the Swagger URL printed by the application. Configure connection strings and Azure settings through .NET User Secrets or environment variables; do not commit credentials. Authenticated API workflows require a configured Microsoft Entra ID application. Foundry calls use the configured Entra-backed identity; no model API key should be committed.
 
-Build and run tests with:
+Build and run provider-independent tests with:
 
 ```bash
 dotnet build RagPlatform.slnx
-dotnet test RagPlatform.slnx
+dotnet test RagPlatform.Api.Tests/RagPlatform.Api.Tests.csproj --filter "TestCategory=Unit"
 ```
 
-EF Core InMemory cannot validate pgvector behavior. Database integration checks require PostgreSQL with the real Npgsql/pgvector model. Live Foundry and Service Bus behaviors require isolated Azure resources; see the [validation roadmap](docs/validation/phase12-phase13-validation-roadmap.md).
+Database-backed tests are categorized as `PostgreSql` and require a disposable PostgreSQL instance with pgvector. Configure `ConnectionStrings__DefaultConnection` for migrations and set `RAGPLATFORM_TEST_POSTGRES_CONNECTION` to the same disposable test database, then apply migrations with `dotnet ef database update` and run:
+
+```bash
+dotnet test RagPlatform.Api.Tests/RagPlatform.Api.Tests.csproj --filter "TestCategory=PostgreSql"
+```
+
+CI runs the unit and PostgreSQL test categories in separate workflows. Live Foundry and Service Bus behaviors require isolated Azure resources; see the [validation roadmap](docs/validation/phase12-phase13-validation-roadmap.md).
 
 ## API surface
 

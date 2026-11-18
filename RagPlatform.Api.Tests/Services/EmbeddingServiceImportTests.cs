@@ -16,7 +16,9 @@ using RagPlatform.Api.Services;
 namespace RagPlatform.Api.Tests.Services;
 
 [TestClass]
-public sealed class EmbeddingServiceImportTests
+[TestCategory("PostgreSql")]
+[DoNotParallelize]
+public sealed class EmbeddingServiceImportTests : PostgreSqlTestClassBase
 {
     [TestMethod]
     public async Task GetValidatedChunksForImportAsync_ReturnsPersistedChunksWithoutUserOrEmbeddingGeneration()
@@ -411,10 +413,7 @@ public sealed class EmbeddingServiceImportTests
 
     private static ApplicationDbContext CreateDbContext()
     {
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-        return new ApplicationDbContext(options);
+        return new ApplicationDbContext(TestDbContextOptions.Create());
     }
 
     private static EmbeddingService CreateService(

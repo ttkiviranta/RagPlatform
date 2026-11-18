@@ -12,7 +12,9 @@ using RagPlatform.Api.Services;
 namespace RagPlatform.Api.Tests.Services;
 
 [TestClass]
-public sealed class DocumentChunkingImportTests
+[TestCategory("PostgreSql")]
+[DoNotParallelize]
+public sealed class DocumentChunkingImportTests : PostgreSqlTestClassBase
 {
     [TestMethod]
     public async Task GenerateChunksForImportAsync_UsesPersistedProcessingDocumentWithoutCurrentUser()
@@ -203,10 +205,7 @@ public sealed class DocumentChunkingImportTests
 
     private static ApplicationDbContext CreateDbContext()
     {
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-        return new ApplicationDbContext(options);
+        return new ApplicationDbContext(TestDbContextOptions.Create());
     }
 
     private static DocumentChunkingService CreateChunkingService(

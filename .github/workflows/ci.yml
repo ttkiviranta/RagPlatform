@@ -43,8 +43,8 @@ jobs:
       - name: Build solution
         run: dotnet build RagPlatform.slnx --configuration Release --no-restore
 
-      - name: Run unit and service tests
-        run: dotnet test RagPlatform.Api.Tests/RagPlatform.Api.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=unit-tests.trx" --results-directory TestResults
+      - name: Run unit tests
+        run: dotnet test RagPlatform.Api.Tests/RagPlatform.Api.Tests.csproj --configuration Release --no-build --filter "TestCategory=Unit" --logger "trx;LogFileName=unit-tests.trx" --results-directory TestResults
 
       - name: Publish test results
         if: always()
