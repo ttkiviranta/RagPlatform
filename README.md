@@ -91,11 +91,14 @@ The import worker runs in `RagPlatform.Api` and is opt-in. It is disabled by def
 - Docker (for the included PostgreSQL/pgvector service), or a compatible PostgreSQL instance with pgvector
 - Azure identity/configuration for features that call Azure services
 
+The repository pins .NET SDK 10.0.100 in `global.json` and the EF Core CLI in `.config/dotnet-tools.json`. A local machine without SDK 10 can roll forward to an installed newer SDK; CI installs the pinned SDK. Restore the local tool manifest before running EF commands.
+
 ### Start PostgreSQL and run the API
 
 ```bash
 docker compose up -d postgres
 dotnet restore
+dotnet tool restore
 dotnet ef database update
 dotnet run --project RagPlatform.Api
 ```
