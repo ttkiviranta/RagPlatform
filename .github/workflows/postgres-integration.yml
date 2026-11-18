@@ -62,7 +62,12 @@ jobs:
         run: dotnet build RagPlatform.slnx --configuration Release --no-restore
 
       - name: Apply database migrations
-        run: dotnet ef database update --project RagPlatform.Api/RagPlatform.Api.csproj --startup-project RagPlatform.Api/RagPlatform.Api.csproj --configuration Release
+        run: |
+          if [ -z "$ConnectionStrings__DefaultConnection" ]; then
+            echo "::error::ConnectionStrings__DefaultConnection is empty"
+            exit 1
+          fi
+          dotnet ef database update --project RagPlatform.Api/RagPlatform.Api.csproj --startup-project RagPlatform.Api/RagPlatform.Api.csproj --configuration Release --connection "$ConnectionStrings__DefaultConnection"
 
       - name: Run PostgreSQL integration tests
         run: dotnet test RagPlatform.Api.Tests/RagPlatform.Api.Tests.csproj --configuration Release --no-build --filter "TestCategory=PostgreSql" --logger "trx;LogFileName=postgres-integration.trx" --results-directory TestResults
