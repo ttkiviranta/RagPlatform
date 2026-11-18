@@ -336,7 +336,7 @@ public sealed class WebContentServiceSecurityTests : PostgreSqlTestClassBase
             Encoding.UTF8);
         if (contentType is not null)
         {
-            content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+            content.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse(contentType);
         }
         else
         {

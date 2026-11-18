@@ -39,12 +39,16 @@ public sealed class DocumentImportProcessorTests : PostgreSqlTestClassBase
 
         await processor.ProcessAsync(document);
         var updatedAt = document.UpdatedAt;
+        using var verificationContext = CreateDbContext(databaseName);
+        var persistedUpdatedAt = await verificationContext.Documents
+            .Select(persistedDocument => persistedDocument.UpdatedAt)
+            .SingleAsync();
         await processor.ProcessAsync(document);
 
         Assert.AreEqual("Extracted PDF text", document.Content);
         Assert.AreEqual(DocumentImportStatus.Completed, document.ImportStatus);
         Assert.AreNotEqual(originalUpdatedAt, updatedAt);
-        Assert.AreEqual(updatedAt, document.UpdatedAt);
+        Assert.AreEqual(persistedUpdatedAt, document.UpdatedAt);
         Assert.AreEqual(1, blobStore.DownloadCount);
         Assert.AreEqual(1, extractor.ExtractionCount);
         Assert.AreEqual(1, chunkingService.ImportChunkingCallCount);
@@ -70,7 +74,6 @@ public sealed class DocumentImportProcessorTests : PostgreSqlTestClassBase
         Assert.AreEqual(1, blobStore.DeleteCount);
         Assert.AreEqual("document/staging-key.pdf", document.StagingBlobKey);
 
-        using var verificationContext = CreateDbContext(databaseName);
         var persistedDocument = await verificationContext.Documents.SingleAsync();
         Assert.AreEqual(DocumentImportStatus.Completed, persistedDocument.ImportStatus);
         Assert.AreEqual(1, await verificationContext.AuditEvents.CountAsync(auditEvent =>
@@ -289,7 +292,12 @@ public sealed class DocumentImportProcessorTests : PostgreSqlTestClassBase
         Assert.AreEqual(1, embeddingService.ImportGenerationCallCount);
         Assert.AreEqual("Persisted extracted text.", document.Content);
         Assert.AreEqual(DocumentImportStatus.Processing, document.ImportStatus);
-        Assert.AreEqual(1, await dbContext.AuditEvents.CountAsync());
+        Assert.AreEqual(1, await dbContext.AuditEvents.CountAsync(auditEvent =>
+            auditEvent.EventType == AuditEventTypes.DocumentImportExtractionSucceeded));
+        Assert.AreEqual(1, await dbContext.AuditEvents.CountAsync(auditEvent =>
+            auditEvent.EventType == AuditEventTypes.DocumentChunksGenerated));
+        Assert.AreEqual(0, await dbContext.AuditEvents.CountAsync(auditEvent =>
+            auditEvent.EventType == AuditEventTypes.DocumentEmbeddingsGenerated));
         Assert.AreEqual(1, blobStore.DeleteCount);
     }
 
