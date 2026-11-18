@@ -134,7 +134,7 @@ public sealed class DocumentImportMessageHandlerTests : PostgreSqlTestClassBase
 
     private static Document CreateDocument()
     {
-        return new Document
+        return PostgreSqlTestData.WithOwner(new Document
         {
             Title = "Test document",
             Content = string.Empty,
@@ -142,10 +142,9 @@ public sealed class DocumentImportMessageHandlerTests : PostgreSqlTestClassBase
             ContentType = "application/pdf",
             FileSize = 10,
             ImportStatus = DocumentImportStatus.Queued,
-            OwnerUserId = Guid.NewGuid(),
             TenantId = "tenant-a",
             StagingBlobKey = "document/staging-key.pdf"
-        };
+        });
     }
 
     private static DocumentImportMessage CreateMessage(Document? document = null)

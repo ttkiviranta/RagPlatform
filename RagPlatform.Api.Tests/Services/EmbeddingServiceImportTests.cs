@@ -435,15 +435,14 @@ public sealed class EmbeddingServiceImportTests : PostgreSqlTestClassBase
 
     private static Document CreateDocument(string content)
     {
-        return new Document
+        return PostgreSqlTestData.WithOwner(new Document
         {
             Title = "Import embedding test document",
             Content = content,
             ImportStatus = DocumentImportStatus.Processing,
-            OwnerUserId = Guid.NewGuid(),
             TenantId = "tenant-a",
             StagingBlobKey = "document/staging-key.pdf"
-        };
+        });
     }
 
     private static DocumentChunk CreateChunk(

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Pgvector.EntityFrameworkCore;
 using RagPlatform.Api.Data;
+using RagPlatform.Api.Models;
 
 namespace RagPlatform.Api.Tests.Services;
 
@@ -24,6 +25,26 @@ internal static class TestDbContextOptions
         }
 
         return optionsBuilder.Options;
+    }
+}
+
+internal static class PostgreSqlTestData
+{
+    public static User CreateUser(string tenantId)
+    {
+        return new User
+        {
+            EntraObjectId = Guid.NewGuid().ToString("N"),
+            TenantId = tenantId
+        };
+    }
+
+    public static Document WithOwner(Document document)
+    {
+        var owner = CreateUser(document.TenantId);
+        document.Owner = owner;
+        document.OwnerUserId = owner.Id;
+        return document;
     }
 }
 

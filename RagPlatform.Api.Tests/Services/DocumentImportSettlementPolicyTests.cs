@@ -145,7 +145,7 @@ public sealed class DocumentImportSettlementPolicyTests : PostgreSqlTestClassBas
 
     private static Document CreateDocument(DocumentImportStatus status)
     {
-        return new Document
+        return PostgreSqlTestData.WithOwner(new Document
         {
             Title = "Test document",
             Content = string.Empty,
@@ -153,9 +153,8 @@ public sealed class DocumentImportSettlementPolicyTests : PostgreSqlTestClassBas
             ContentType = "application/pdf",
             FileSize = 10,
             ImportStatus = status,
-            OwnerUserId = Guid.NewGuid(),
             TenantId = "tenant-a",
             StagingBlobKey = "document/staging-key.pdf"
-        };
+        });
     }
 }

@@ -416,7 +416,7 @@ public sealed class DocumentImportProcessorTests : PostgreSqlTestClassBase
 
     private static Document CreateDocument()
     {
-        return new Document
+        return PostgreSqlTestData.WithOwner(new Document
         {
             Title = "Test document",
             Content = string.Empty,
@@ -424,10 +424,9 @@ public sealed class DocumentImportProcessorTests : PostgreSqlTestClassBase
             ContentType = "application/pdf",
             FileSize = 10,
             ImportStatus = DocumentImportStatus.Processing,
-            OwnerUserId = Guid.NewGuid(),
             TenantId = "tenant-a",
             StagingBlobKey = "document/staging-key.pdf"
-        };
+        });
     }
 
     private sealed class FakeStagingBlobStore : IStagingBlobStore

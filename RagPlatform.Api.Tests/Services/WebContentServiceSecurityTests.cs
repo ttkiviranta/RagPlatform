@@ -317,7 +317,8 @@ public sealed class WebContentServiceSecurityTests : PostgreSqlTestClassBase
         var handler = new StubHttpMessageHandler(send);
         var httpClient = new HttpClient(handler);
         var dbContext = new ApplicationDbContext(TestDbContextOptions.Create());
-        var user = new User { TenantId = "tenant-a" };
+        var user = PostgreSqlTestData.CreateUser("tenant-a");
+        dbContext.Users.Add(user);
         var service = new WebContentService(
             dbContext,
             new FakeDocumentAccessService(user),
