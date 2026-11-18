@@ -1,6 +1,4 @@
 ﻿using System.Reflection;
-using Microsoft.ApplicationInsights;
-using Microsoft.ApplicationInsights.Extensibility;
 using System.Security.Claims;
 using Azure.Core;
 using Azure.Identity;
@@ -82,11 +80,17 @@ var azureAdAuthority = builder.Configuration["AzureAd:Authority"]
 var azureAdAudience = builder.Configuration["AzureAd:Audience"]
     ?? $"api://{builder.Configuration["AzureAd:ClientId"]}";
 
-var appInsightsConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"]
-    ?? Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING");
-var telemetryExportersEnabled = !builder.Environment.IsEnvironment("Testing");
+var appInsightsConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
+if (string.IsNullOrWhiteSpace(appInsightsConnectionString))
+{
+    appInsightsConnectionString = Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING");
+}
 
-if (telemetryExportersEnabled && !string.IsNullOrWhiteSpace(appInsightsConnectionString))
+var telemetryExportersEnabled = !builder.Environment.IsEnvironment("Testing");
+var applicationInsightsEnabled = telemetryExportersEnabled
+    && !string.IsNullOrWhiteSpace(appInsightsConnectionString);
+
+if (applicationInsightsEnabled)
 {
     builder.Services.AddApplicationInsightsTelemetry(options =>
     {
@@ -95,7 +99,6 @@ if (telemetryExportersEnabled && !string.IsNullOrWhiteSpace(appInsightsConnectio
 }
 else
 {
-    builder.Services.AddSingleton(new TelemetryClient(new TelemetryConfiguration()));
     builder.Logging.AddConsole();
 }
 
@@ -287,7 +290,15 @@ builder.Services.AddScoped<IRagCitationService, RagCitationService>();
 builder.Services.AddScoped<IAnswerGenerationService, FoundryAnswerGenerationService>();
 builder.Services.AddScoped<IRagService, RagService>();
 builder.Services.AddScoped<IFoundryChatCompletionService, FoundryChatCompletionService>();
-builder.Services.AddScoped<ITelemetryService, ApplicationInsightsTelemetryService>();
+if (applicationInsightsEnabled)
+{
+    builder.Services.AddScoped<ITelemetryService, ApplicationInsightsTelemetryService>();
+}
+else
+{
+    builder.Services.AddSingleton<ITelemetryService, NoOpTelemetryService>();
+}
+
 builder.Services.AddScoped<IUserBootstrapService, UserBootstrapService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IDocumentAccessService, DocumentAccessService>();

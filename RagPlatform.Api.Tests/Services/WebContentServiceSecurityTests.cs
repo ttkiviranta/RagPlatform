@@ -94,7 +94,7 @@ public sealed class WebContentServiceSecurityTests : PostgreSqlTestClassBase
     [TestCategory("Unit")]
     public async Task ImportAsync_LoopbackLiteral_IsRejectedBeforeSendingRequest()
     {
-        var fixture = CreateFixture(_ => Task.FromResult(CreateHtmlResponse("text/html")));
+        var fixture = CreateFixture(_ => Task.FromResult(CreateHtmlResponse("text/html")), seedUser: false);
         using (fixture)
         {
             await Assert.ThrowsExactlyAsync<ArgumentException>(
@@ -157,7 +157,7 @@ public sealed class WebContentServiceSecurityTests : PostgreSqlTestClassBase
     public async Task ImportAsync_RedirectsToPrivateDestination_RejectsBeforeSecondRequest()
     {
         var fixture = CreateFixture(_ => Task.FromResult(
-            CreateRedirectResponse(HttpStatusCode.Found, "http://127.0.0.1/private")));
+            CreateRedirectResponse(HttpStatusCode.Found, "http://127.0.0.1/private")), seedUser: false);
         using (fixture)
         {
             await Assert.ThrowsExactlyAsync<HttpRequestException>(
@@ -172,7 +172,7 @@ public sealed class WebContentServiceSecurityTests : PostgreSqlTestClassBase
     public async Task ImportAsync_HttpsRedirectToHttp_RejectsDowngrade()
     {
         var fixture = CreateFixture(_ => Task.FromResult(
-            CreateRedirectResponse(HttpStatusCode.Found, "http://example.com/next")));
+            CreateRedirectResponse(HttpStatusCode.Found, "http://example.com/next")), seedUser: false);
         using (fixture)
         {
             await Assert.ThrowsExactlyAsync<HttpRequestException>(
@@ -188,7 +188,7 @@ public sealed class WebContentServiceSecurityTests : PostgreSqlTestClassBase
     {
         var fixture = CreateFixture(request => Task.FromResult(
             CreateRedirectResponse(HttpStatusCode.Found,
-                request.RequestUri!.AbsolutePath == "/first" ? "/second" : "/first")));
+                request.RequestUri!.AbsolutePath == "/first" ? "/second" : "/first")), seedUser: false);
         using (fixture)
         {
             await Assert.ThrowsExactlyAsync<HttpRequestException>(
@@ -225,7 +225,7 @@ public sealed class WebContentServiceSecurityTests : PostgreSqlTestClassBase
         {
             var index = int.Parse(request.RequestUri!.AbsolutePath.TrimStart('/'));
             return Task.FromResult(CreateRedirectResponse(HttpStatusCode.TemporaryRedirect, $"/{index + 1}"));
-        });
+        }, seedUser: false);
         using (fixture)
         {
             await Assert.ThrowsExactlyAsync<HttpRequestException>(
@@ -286,7 +286,7 @@ public sealed class WebContentServiceSecurityTests : PostgreSqlTestClassBase
     {
         var content = new ByteArrayContent(new byte[MaximumResponseBytes + 1]);
         content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/html");
-        var fixture = CreateFixture(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content }));
+        var fixture = CreateFixture(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content }), seedUser: false);
         using (fixture)
         {
             await Assert.ThrowsExactlyAsync<HttpRequestException>(
@@ -302,7 +302,7 @@ public sealed class WebContentServiceSecurityTests : PostgreSqlTestClassBase
         Encoding.UTF8.GetBytes("<html><body><main>Content</main></body></html>").CopyTo(body, 0);
         var content = new StreamContent(new NonSeekableReadStream(new MemoryStream(body)));
         content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/html");
-        var fixture = CreateFixture(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content }));
+        var fixture = CreateFixture(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content }), seedUser: false);
         using (fixture)
         {
             Assert.IsNull(content.Headers.ContentLength);
@@ -312,13 +312,19 @@ public sealed class WebContentServiceSecurityTests : PostgreSqlTestClassBase
         }
     }
 
-    private static TestFixture CreateFixture(Func<HttpRequestMessage, Task<HttpResponseMessage>> send)
+    private static TestFixture CreateFixture(
+        Func<HttpRequestMessage, Task<HttpResponseMessage>> send,
+        bool seedUser = true)
     {
         var handler = new StubHttpMessageHandler(send);
         var httpClient = new HttpClient(handler);
         var dbContext = new ApplicationDbContext(TestDbContextOptions.Create());
         var user = PostgreSqlTestData.CreateUser("tenant-a");
-        dbContext.Users.Add(user);
+        if (seedUser)
+        {
+            dbContext.Users.Add(user);
+        }
+
         var service = new WebContentService(
             dbContext,
             new FakeDocumentAccessService(user),

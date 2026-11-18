@@ -56,7 +56,7 @@ public sealed class PdfPigTextExtractorTests
     [TestMethod]
     public void Extract_WhitespaceOnlyPdf_ThrowsPermanentFailure()
     {
-        using var stream = new MemoryStream(CreatePdf("   \t"));
+        using var stream = new MemoryStream(CreatePdf("   "));
 
         var exception = Assert.ThrowsExactly<PermanentPdfFailureException>(
             () => _extractor.Extract(stream));
