@@ -1,8 +1,4 @@
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using RagPlatform.Api.Data;
 
@@ -72,25 +68,14 @@ public sealed class PostgreSqlConnectionStringConfigurationTests
 
     private static NpgsqlConnectionStringBuilder GetConfiguredConnectionString(string defaultConnectionString)
     {
-        using var factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder =>
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                builder.UseEnvironment("Testing");
-                builder.ConfigureAppConfiguration((_, configuration) =>
-                    configuration.AddInMemoryCollection(new Dictionary<string, string?>
-                    {
-                        ["ConnectionStrings:DefaultConnection"] = defaultConnectionString
-                    }));
-            });
-        using var scope = factory.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var connectionString = dbContext.Database.GetConnectionString();
+                ["ConnectionStrings:DefaultConnection"] = defaultConnectionString
+            })
+            .Build();
 
-        if (connectionString is null)
-        {
-            throw new InvalidOperationException("The configured PostgreSQL connection string was null.");
-        }
-
+        var connectionString = PostgreSqlConnectionStringResolver.Resolve(configuration);
         return new NpgsqlConnectionStringBuilder(connectionString);
     }
 
