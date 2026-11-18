@@ -120,6 +120,49 @@ dotnet test RagPlatform.Api.Tests/RagPlatform.Api.Tests.csproj --filter "TestCat
 
 CI runs the unit and PostgreSQL test categories in separate workflows. Live Foundry and Service Bus behaviors require isolated Azure resources; see the [validation roadmap](docs/validation/phase12-phase13-validation-roadmap.md).
 
+## Testing and CI
+
+### Unit Tests
+
+- Executed in GitHub Actions on every push and pull request.
+- Category: `Unit`
+- Current count: 54 tests
+
+```bash
+dotnet test --filter "TestCategory=Unit"
+```
+
+### PostgreSQL Integration Tests
+
+- Executed in a dedicated GitHub Actions workflow.
+- Uses PostgreSQL with pgvector.
+- Applies EF Core migrations automatically.
+- Category: `PostgreSql`
+- Current count: 55 tests
+
+```bash
+dotnet test --filter "TestCategory=PostgreSql"
+```
+
+### CI Workflow
+
+- Build the application.
+- Execute unit tests.
+- Provision PostgreSQL/pgvector.
+- Apply EF Core migrations.
+- Execute integration tests.
+- Publish TRX artifacts.
+
+### Current Status
+
+- ✅ GitHub Actions CI enabled
+- ✅ Unit tests passing (54/54)
+- ✅ PostgreSQL integration tests passing (55/55)
+- ✅ EF Core migrations validated in CI
+- ✅ pgvector integration validated in CI
+
+**Total automated tests: 109**
+
 ## API surface
 
 The API includes document CRUD and upload, URL import, document processing/metadata, chunks and embeddings, vector search, RAG query, conversations/messages, and document import status. OpenAPI/Swagger is the interactive API reference when the service is running.
