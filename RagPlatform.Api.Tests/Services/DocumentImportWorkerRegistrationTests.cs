@@ -14,7 +14,8 @@ public sealed class DocumentImportWorkerRegistrationTests
     [TestMethod]
     public void WorkerDisabledByDefault_IsNotRegistered()
     {
-        using var factory = new WebApplicationFactory<Program>();
+        using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
 
         var configuration = factory.Services.GetRequiredService<IConfiguration>();
         var hostedServices = factory.Services.GetServices<IHostedService>();
@@ -27,11 +28,15 @@ public sealed class DocumentImportWorkerRegistrationTests
     public void WorkerExplicitlyDisabled_IsNotRegistered()
     {
         using var factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) =>
-                configuration.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["ServiceBus:DocumentImportWorkerEnabled"] = "false"
-                })));
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseEnvironment("Testing");
+                builder.ConfigureAppConfiguration((_, configuration) =>
+                    configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["ServiceBus:DocumentImportWorkerEnabled"] = "false"
+                    }));
+            });
 
         var hostedServices = factory.Services.GetServices<IHostedService>();
 

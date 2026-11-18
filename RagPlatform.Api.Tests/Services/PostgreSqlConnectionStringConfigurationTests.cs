@@ -73,11 +73,15 @@ public sealed class PostgreSqlConnectionStringConfigurationTests
     private static NpgsqlConnectionStringBuilder GetConfiguredConnectionString(string defaultConnectionString)
     {
         using var factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) =>
-                configuration.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["ConnectionStrings:DefaultConnection"] = defaultConnectionString
-                })));
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseEnvironment("Testing");
+                builder.ConfigureAppConfiguration((_, configuration) =>
+                    configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["ConnectionStrings:DefaultConnection"] = defaultConnectionString
+                    }));
+            });
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var connectionString = dbContext.Database.GetConnectionString();

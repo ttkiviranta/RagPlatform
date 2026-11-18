@@ -84,8 +84,9 @@ var azureAdAudience = builder.Configuration["AzureAd:Audience"]
 
 var appInsightsConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"]
     ?? Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING");
+var telemetryExportersEnabled = !builder.Environment.IsEnvironment("Testing");
 
-if (!string.IsNullOrWhiteSpace(appInsightsConnectionString))
+if (telemetryExportersEnabled && !string.IsNullOrWhiteSpace(appInsightsConnectionString))
 {
     builder.Services.AddApplicationInsightsTelemetry(options =>
     {
@@ -244,7 +245,7 @@ builder.Services.AddOpenTelemetry()
             .AddSqlClientInstrumentation();
 
         var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
-        if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+        if (telemetryExportersEnabled && !string.IsNullOrWhiteSpace(otlpEndpoint))
         {
             tracing.AddOtlpExporter(options => options.Endpoint = new Uri(otlpEndpoint));
         }
@@ -256,7 +257,7 @@ builder.Services.AddOpenTelemetry()
             .AddHttpClientInstrumentation();
 
         var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
-        if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+        if (telemetryExportersEnabled && !string.IsNullOrWhiteSpace(otlpEndpoint))
         {
             metrics.AddOtlpExporter(options => options.Endpoint = new Uri(otlpEndpoint));
         }
