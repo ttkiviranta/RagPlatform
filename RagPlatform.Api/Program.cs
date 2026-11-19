@@ -284,6 +284,7 @@ builder.Services.AddScoped<IDocumentChunkingService, DocumentChunkingService>();
 builder.Services.AddScoped<IEmbeddingProvider, FoundryEmbeddingProvider>();
 builder.Services.AddScoped<IEmbeddingService, EmbeddingService>();
 builder.Services.AddScoped<IVectorSearchService, VectorSearchService>();
+builder.Services.AddScoped<IFullTextSearchService, FullTextSearchService>();
 builder.Services.AddScoped<IContextBuilder, ContextBuilder>();
 builder.Services.AddScoped<IPromptBuilder, PromptBuilder>();
 builder.Services.AddScoped<IRagCitationService, RagCitationService>();
