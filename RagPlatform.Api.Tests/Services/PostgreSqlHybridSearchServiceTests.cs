@@ -108,7 +108,7 @@ public sealed class PostgreSqlHybridSearchServiceTests : PostgreSqlTestClassBase
         var fullTextOnly = await AddCandidateAsync(
             dbContext,
             "hybridmarker full text only",
-            new[] { 0f, 1f });
+            embedding: null);
 
         return new CandidateFixture(
             overlap.ChunkId,
@@ -120,7 +120,7 @@ public sealed class PostgreSqlHybridSearchServiceTests : PostgreSqlTestClassBase
     private static async Task<(Guid ChunkId, Guid DocumentId)> AddCandidateAsync(
         ApplicationDbContext dbContext,
         string content,
-        float[] embedding)
+        float[]? embedding)
     {
         var document = new Document
         {
@@ -137,17 +137,19 @@ public sealed class PostgreSqlHybridSearchServiceTests : PostgreSqlTestClassBase
             Content = content,
             CharacterCount = content.Length
         };
-        var documentEmbedding = new DocumentEmbedding
-        {
-            ChunkId = chunk.Id,
-            EmbeddingVector = new Vector(embedding),
-            VectorDimensions = embedding.Length,
-            ModelName = EmbeddingModelName
-        };
-
         dbContext.Documents.Add(document);
         dbContext.DocumentChunks.Add(chunk);
-        dbContext.DocumentEmbeddings.Add(documentEmbedding);
+        if (embedding is not null)
+        {
+            dbContext.DocumentEmbeddings.Add(new DocumentEmbedding
+            {
+                ChunkId = chunk.Id,
+                EmbeddingVector = new Vector(embedding),
+                VectorDimensions = embedding.Length,
+                ModelName = EmbeddingModelName
+            });
+        }
+
         await dbContext.SaveChangesAsync();
         return (chunk.Id, document.Id);
     }
