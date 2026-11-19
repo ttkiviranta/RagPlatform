@@ -167,6 +167,32 @@ dotnet test --filter "TestCategory=PostgreSql"
 
 The API includes document CRUD and upload, URL import, document processing/metadata, chunks and embeddings, vector search, RAG query, conversations/messages, and document import status. OpenAPI/Swagger is the interactive API reference when the service is running.
 
+## Roadmap
+
+### Completed
+
+- Vector Search (pgvector)
+- PostgreSQL Full-Text Search
+- FullTextSearchService
+- Document Ingestion Pipeline
+- Semantic Search
+- Citations
+- Conversation History
+- PostgreSQL Integration Testing
+- GitHub Actions CI/CD
+
+### In Progress
+
+- Hybrid Search
+
+### Planned
+
+- Reciprocal Rank Fusion (RRF)
+- RAG retrieval backed by Hybrid Search
+- Reranking
+- Search quality evaluation
+- Additional retrieval strategies
+
 ## Next steps
 
 Complete and record the Phase 12 PostgreSQL/pgvector and isolated Service Bus rollout gates, then complete Phase 13 database, live Foundry, answer-quality, security, and operational acceptance. The previously identified Phase 14–17 themes (Copilot Studio integration, GraphRAG, administration, and AI engineering/operations) remain roadmap items rather than current implementation scope; the proposed sequencing below is not yet approved.
