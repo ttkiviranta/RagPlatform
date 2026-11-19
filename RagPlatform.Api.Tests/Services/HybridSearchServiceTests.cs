@@ -47,38 +47,118 @@ public sealed class HybridSearchServiceTests
         var results = await service.SearchAsync("query");
 
         Assert.AreEqual(3, results.Count);
-        Assert.IsTrue(results[0].FoundByVectorSearch);
-        Assert.IsTrue(results[0].FoundByFullTextSearch);
-        Assert.IsTrue(results[1].FoundByVectorSearch);
-        Assert.IsFalse(results[1].FoundByFullTextSearch);
-        Assert.IsFalse(results[2].FoundByVectorSearch);
-        Assert.IsTrue(results[2].FoundByFullTextSearch);
+        var resultsByChunkId = results.ToDictionary(result => result.ChunkId);
+        Assert.IsTrue(resultsByChunkId[overlapId].FoundByVectorSearch);
+        Assert.IsTrue(resultsByChunkId[overlapId].FoundByFullTextSearch);
+        Assert.IsTrue(resultsByChunkId[vectorOnlyId].FoundByVectorSearch);
+        Assert.IsFalse(resultsByChunkId[vectorOnlyId].FoundByFullTextSearch);
+        Assert.IsFalse(resultsByChunkId[textOnlyId].FoundByVectorSearch);
+        Assert.IsTrue(resultsByChunkId[textOnlyId].FoundByFullTextSearch);
     }
 
     [TestMethod]
-    public async Task SearchAsync_Results_AreOrderedOverlapThenVectorOnlyThenFullTextOnly()
+    public async Task SearchAsync_OverlappingCandidate_RanksAboveSingleSourceCandidates()
     {
-        var vectorOnlyFirst = Guid.NewGuid();
         var overlap = Guid.NewGuid();
-        var vectorOnlySecond = Guid.NewGuid();
+        var vectorOnly = Guid.NewGuid();
         var textOnly = Guid.NewGuid();
         var vectorService = new FakeVectorSearchService(CreateVectorResponse(
-            CreateVectorResult(vectorOnlyFirst, Guid.NewGuid(), "vector 1"),
-            CreateVectorResult(overlap, Guid.NewGuid(), "overlap snippet"),
-            CreateVectorResult(vectorOnlySecond, Guid.NewGuid(), "vector 2")));
+            CreateVectorResult(vectorOnly, Guid.NewGuid(), "vector content"),
+            CreateVectorResult(overlap, Guid.NewGuid(), "overlap snippet")));
         var overlapDocumentId = vectorService.Results.Results[1].DocumentId;
         var fullTextService = new FakeFullTextSearchService(
-            CreateFullTextResult(overlap, overlapDocumentId, "overlap content"),
-            CreateFullTextResult(textOnly, Guid.NewGuid(), "text content"));
+            CreateFullTextResult(textOnly, Guid.NewGuid(), "text content"),
+            CreateFullTextResult(overlap, overlapDocumentId, "overlap content"));
+        var service = CreateService(vectorService, fullTextService);
+
+        var results = await service.SearchAsync("query", topK: 3);
+
+        var expectedOverlapScore = 1d / (60 + 2) + 1d / (60 + 2);
+        var expectedSingleSourceScore = 1d / (60 + 1);
+        Assert.IsGreaterThan(expectedSingleSourceScore, expectedOverlapScore);
+        Assert.AreEqual(overlap, results[0].ChunkId);
+        Assert.IsTrue(results[0].FoundByVectorSearch);
+        Assert.IsTrue(results[0].FoundByFullTextSearch);
+        Assert.AreEqual(3, results.Count);
+    }
+
+    [TestMethod]
+    public async Task SearchAsync_VectorOnlyCandidates_UseTheirVectorRanks()
+    {
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        var vectorService = new FakeVectorSearchService(CreateVectorResponse(
+            CreateVectorResult(first, Guid.NewGuid(), "first vector result"),
+            CreateVectorResult(second, Guid.NewGuid(), "second vector result")));
+        var service = CreateService(vectorService, new FakeFullTextSearchService());
+
+        var results = await service.SearchAsync("query");
+
+        CollectionAssert.AreEqual(new[] { first, second }, results.Select(result => result.ChunkId).ToArray());
+        Assert.IsTrue(results.All(result => result.FoundByVectorSearch && !result.FoundByFullTextSearch));
+    }
+
+    [TestMethod]
+    public async Task SearchAsync_FullTextOnlyCandidates_UseTheirFullTextRanks()
+    {
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        var fullTextService = new FakeFullTextSearchService(
+            CreateFullTextResult(first, Guid.NewGuid(), "first text result"),
+            CreateFullTextResult(second, Guid.NewGuid(), "second text result"));
+        var service = CreateService(new FakeVectorSearchService(CreateVectorResponse()), fullTextService);
+
+        var results = await service.SearchAsync("query");
+
+        CollectionAssert.AreEqual(new[] { first, second }, results.Select(result => result.ChunkId).ToArray());
+        Assert.IsTrue(results.All(result => !result.FoundByVectorSearch && result.FoundByFullTextSearch));
+    }
+
+    [TestMethod]
+    public async Task SearchAsync_EqualRrfScores_UsesChunkIdAsDeterministicTieBreaker()
+    {
+        var lowerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var higherId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+        var vectorService = new FakeVectorSearchService(CreateVectorResponse(
+            CreateVectorResult(higherId, Guid.NewGuid(), "vector candidate")));
+        var fullTextService = new FakeFullTextSearchService(
+            CreateFullTextResult(lowerId, Guid.NewGuid(), "text candidate"));
+        var service = CreateService(vectorService, fullTextService);
+
+        var results = await service.SearchAsync("query");
+
+        CollectionAssert.AreEqual(new[] { lowerId, higherId }, results.Select(result => result.ChunkId).ToArray());
+    }
+
+    [TestMethod]
+    public async Task SearchAsync_MixedRanks_UsesExpectedRrfCalculations()
+    {
+        var vectorFirstTextThird = Guid.NewGuid();
+        var vectorSecondTextFirst = Guid.NewGuid();
+        var vectorOnly = Guid.NewGuid();
+        var fullTextOnly = Guid.NewGuid();
+        var vectorService = new FakeVectorSearchService(CreateVectorResponse(
+            CreateVectorResult(vectorFirstTextThird, Guid.NewGuid(), "vector rank one"),
+            CreateVectorResult(vectorSecondTextFirst, Guid.NewGuid(), "vector rank two"),
+            CreateVectorResult(vectorOnly, Guid.NewGuid(), "vector-only rank three")));
+        var fullTextService = new FakeFullTextSearchService(
+            CreateFullTextResult(vectorSecondTextFirst, vectorService.Results.Results[1].DocumentId, "text rank one"),
+            CreateFullTextResult(fullTextOnly, Guid.NewGuid(), "text-only rank two"),
+            CreateFullTextResult(vectorFirstTextThird, vectorService.Results.Results[0].DocumentId, "text rank three"));
         var service = CreateService(vectorService, fullTextService);
 
         var results = await service.SearchAsync("query", topK: 4);
 
+        var firstCandidateScore = 1d / (60 + 1) + 1d / (60 + 3);
+        var secondCandidateScore = 1d / (60 + 2) + 1d / (60 + 1);
+        Assert.IsGreaterThan(firstCandidateScore, secondCandidateScore);
         CollectionAssert.AreEqual(
-            new[] { overlap, vectorOnlyFirst, vectorOnlySecond, textOnly },
+            new[] { vectorSecondTextFirst, vectorFirstTextThird, fullTextOnly, vectorOnly },
             results.Select(result => result.ChunkId).ToArray());
-        Assert.AreEqual(8, vectorService.LastTopK);
-        Assert.AreEqual(8, fullTextService.LastTopK);
+        Assert.IsFalse(results[2].FoundByVectorSearch);
+        Assert.IsTrue(results[2].FoundByFullTextSearch);
+        Assert.IsTrue(results[3].FoundByVectorSearch);
+        Assert.IsFalse(results[3].FoundByFullTextSearch);
     }
 
     [TestMethod]

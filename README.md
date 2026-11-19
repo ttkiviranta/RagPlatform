@@ -73,6 +73,20 @@ Question
 
 The import worker runs in `RagPlatform.Api` and is opt-in. It is disabled by default pending Phase 12 acceptance. Retrieval and authorization are application-controlled; model output is not an authorization boundary. Conversation history is owner- and tenant-scoped, bounded, and not treated as evidence for later answers.
 
+### Hybrid Search
+
+```text
+Query
+  ↓
+VectorSearchService
+  +
+FullTextSearchService
+  ↓
+HybridSearchService
+  ↓
+Results
+```
+
 ## Technology
 
 - ASP.NET Core 10 / C#
@@ -126,7 +140,7 @@ CI runs the unit and PostgreSQL test categories in separate workflows. Live Foun
 
 - Executed in GitHub Actions on every push and pull request.
 - Category: `Unit`
-- Current count: 58 tests
+- Current count: 62 tests
 
 ```bash
 dotnet test --filter "TestCategory=Unit"
@@ -138,7 +152,7 @@ dotnet test --filter "TestCategory=Unit"
 - Uses PostgreSQL with pgvector.
 - Applies EF Core migrations automatically.
 - Category: `PostgreSql`
-- Current count: 66 tests
+- Current count: 67 tests
 
 ```bash
 dotnet test --filter "TestCategory=PostgreSql"
@@ -156,12 +170,12 @@ dotnet test --filter "TestCategory=PostgreSql"
 ### Current Status
 
 - ✅ GitHub Actions CI enabled
-- ✅ Unit tests passing (58/58)
-- ✅ PostgreSQL integration tests passing (66/66)
+- ✅ Unit tests passing (62/62)
+- ✅ PostgreSQL integration tests passing (67/67)
 - ✅ EF Core migrations validated in CI
 - ✅ pgvector integration validated in CI
 
-**Total automated tests: 124**
+**Total automated tests: 129**
 
 ## API surface
 
@@ -175,6 +189,7 @@ The API includes document CRUD and upload, URL import, document processing/metad
 - PostgreSQL Full-Text Search
 - FullTextSearchService
 - HybridSearchService
+- Reciprocal Rank Fusion (RRF)
 - Document Ingestion Pipeline
 - Semantic Search
 - Citations
@@ -184,7 +199,7 @@ The API includes document CRUD and upload, URL import, document processing/metad
 
 ### In Progress
 
-- Reciprocal Rank Fusion (RRF)
+- None
 
 ### Planned
 

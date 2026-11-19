@@ -6,6 +6,7 @@ public sealed class HybridSearchService : IHybridSearchService
 {
     private const int CandidateMultiplier = 2;
     private const int MaximumCandidateCount = 50;
+    private const int ReciprocalRankFusionConstant = 60;
 
     private readonly IVectorSearchService _vectorSearchService;
     private readonly IFullTextSearchService _fullTextSearchService;
@@ -49,75 +50,76 @@ public sealed class HybridSearchService : IHybridSearchService
             cancellationToken,
             documentId);
 
-        var vectorResultsList = vectorResults.Results;
-        var fullTextResultsByChunkId = fullTextResults
-            .GroupBy(result => result.ChunkId)
-            .ToDictionary(group => group.Key, group => group.First());
-        var seenChunkIds = new HashSet<Guid>();
-        var overlappingResults = new List<HybridSearchResult>();
-        var vectorOnlyResults = new List<HybridSearchResult>();
-        var fullTextOnlyResults = new List<HybridSearchResult>();
-
-        foreach (var vectorResult in vectorResultsList)
+        var candidates = new Dictionary<Guid, RankedCandidate>();
+        var seenVectorChunkIds = new HashSet<Guid>();
+        for (var index = 0; index < vectorResults.Results.Count; index++)
         {
-            if (!seenChunkIds.Add(vectorResult.ChunkId))
+            var vectorResult = vectorResults.Results[index];
+            if (!seenVectorChunkIds.Add(vectorResult.ChunkId))
             {
                 continue;
             }
 
-            if (fullTextResultsByChunkId.TryGetValue(vectorResult.ChunkId, out var fullTextResult))
+            if (!candidates.TryGetValue(vectorResult.ChunkId, out var candidate))
             {
-                overlappingResults.Add(new HybridSearchResult
+                candidate = new RankedCandidate(new HybridSearchResult
                 {
                     ChunkId = vectorResult.ChunkId,
                     DocumentId = vectorResult.DocumentId,
-                    Content = fullTextResult.Content,
-                    FoundByVectorSearch = true,
-                    FoundByFullTextSearch = true
+                    Content = vectorResult.ContentSnippet
                 });
+                candidates.Add(vectorResult.ChunkId, candidate);
             }
-            else
-            {
-                vectorOnlyResults.Add(new HybridSearchResult
-                {
-                    ChunkId = vectorResult.ChunkId,
-                    DocumentId = vectorResult.DocumentId,
-                    Content = vectorResult.ContentSnippet,
-                    FoundByVectorSearch = true
-                });
-            }
+
+            candidate.Result.FoundByVectorSearch = true;
+            candidate.Score += 1d / (ReciprocalRankFusionConstant + index + 1);
         }
 
-        foreach (var fullTextResult in fullTextResults)
+        var seenFullTextChunkIds = new HashSet<Guid>();
+        for (var index = 0; index < fullTextResults.Count; index++)
         {
-            if (!seenChunkIds.Add(fullTextResult.ChunkId))
+            var fullTextResult = fullTextResults[index];
+            if (!seenFullTextChunkIds.Add(fullTextResult.ChunkId))
             {
                 continue;
             }
 
-            fullTextOnlyResults.Add(new HybridSearchResult
+            if (!candidates.TryGetValue(fullTextResult.ChunkId, out var candidate))
             {
-                ChunkId = fullTextResult.ChunkId,
-                DocumentId = fullTextResult.DocumentId,
-                Content = fullTextResult.Content,
-                FoundByFullTextSearch = true
-            });
+                candidate = new RankedCandidate(new HybridSearchResult
+                {
+                    ChunkId = fullTextResult.ChunkId,
+                    DocumentId = fullTextResult.DocumentId
+                });
+                candidates.Add(fullTextResult.ChunkId, candidate);
+            }
+
+            candidate.Result.Content = fullTextResult.Content;
+            candidate.Result.FoundByFullTextSearch = true;
+            candidate.Score += 1d / (ReciprocalRankFusionConstant + index + 1);
         }
 
-        var results = overlappingResults
-            .Concat(vectorOnlyResults)
-            .Concat(fullTextOnlyResults)
+        var rankedCandidates = candidates.Values
+            .OrderByDescending(candidate => candidate.Score)
+            .ThenBy(candidate => candidate.Result.ChunkId)
+            .ToList();
+        var results = rankedCandidates
             .Take(topK)
+            .Select(candidate => candidate.Result)
             .ToList();
 
         _logger.LogInformation(
-            "Hybrid search returned {ResultCount} results: {OverlapCount} overlapping, "
-            + "{VectorOnlyCount} vector-only, {FullTextOnlyCount} full-text-only.",
+            "Hybrid search returned {ResultCount} results from {CandidateCount} unique candidates.",
             results.Count,
-            overlappingResults.Count,
-            vectorOnlyResults.Count,
-            fullTextOnlyResults.Count);
+            candidates.Count);
 
         return results;
+    }
+
+    private sealed class RankedCandidate(HybridSearchResult result)
+    {
+        public HybridSearchResult Result { get; } = result;
+
+        public double Score { get; set; }
     }
 }

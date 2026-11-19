@@ -24,7 +24,7 @@ public sealed class PostgreSqlHybridSearchServiceTests : PostgreSqlTestClassBase
     private const string EmbeddingModelName = "hybrid-search-test-model";
 
     [TestMethod]
-    public async Task SearchAsync_PostgreSqlCandidates_MergesOverlapAndOrdersResultTiers()
+    public async Task SearchAsync_PostgreSqlCandidates_OrdersByRrfScore()
     {
         using var dbContext = CreateDbContext();
         var fixture = await SeedCandidatesAsync(dbContext);
@@ -34,14 +34,14 @@ public sealed class PostgreSqlHybridSearchServiceTests : PostgreSqlTestClassBase
 
         Assert.AreEqual(3, results.Count);
         CollectionAssert.AreEqual(
-            new[] { fixture.OverlapChunkId, fixture.VectorOnlyChunkId, fixture.FullTextOnlyChunkId },
+            new[] { fixture.OverlapChunkId, fixture.FullTextOnlyChunkId, fixture.VectorOnlyChunkId },
             results.Select(result => result.ChunkId).ToArray());
         Assert.IsTrue(results[0].FoundByVectorSearch);
         Assert.IsTrue(results[0].FoundByFullTextSearch);
-        Assert.IsTrue(results[1].FoundByVectorSearch);
-        Assert.IsFalse(results[1].FoundByFullTextSearch);
-        Assert.IsFalse(results[2].FoundByVectorSearch);
-        Assert.IsTrue(results[2].FoundByFullTextSearch);
+        Assert.IsFalse(results[1].FoundByVectorSearch);
+        Assert.IsTrue(results[1].FoundByFullTextSearch);
+        Assert.IsTrue(results[2].FoundByVectorSearch);
+        Assert.IsFalse(results[2].FoundByFullTextSearch);
         Assert.AreEqual("hybridmarker overlap full text", results[0].Content);
         Assert.AreEqual(3, results.Select(result => result.ChunkId).Distinct().Count());
     }
@@ -62,19 +62,63 @@ public sealed class PostgreSqlHybridSearchServiceTests : PostgreSqlTestClassBase
         Assert.IsTrue(results[0].FoundByFullTextSearch);
     }
 
+    [TestMethod]
+    public async Task SearchAsync_UserScope_FiltersByTenantAndOwner()
+    {
+        using var dbContext = CreateDbContext();
+        var currentOwner = PostgreSqlTestData.CreateUser(TenantId);
+        var otherOwner = PostgreSqlTestData.CreateUser(TenantId);
+        var otherTenantOwner = PostgreSqlTestData.CreateUser("other-tenant");
+        dbContext.Users.AddRange(currentOwner, otherOwner, otherTenantOwner);
+        await dbContext.SaveChangesAsync();
+
+        var allowed = await AddCandidateAsync(
+            dbContext,
+            "accessmarker owned document",
+            new[] { 1f, 0f },
+            ownerUserId: currentOwner.Id);
+        await AddCandidateAsync(
+            dbContext,
+            "accessmarker other owner document",
+            new[] { 0.9f, 0.1f },
+            ownerUserId: otherOwner.Id);
+        await AddCandidateAsync(
+            dbContext,
+            "accessmarker other tenant document",
+            new[] { 0.8f, 0.6f },
+            tenantId: otherTenantOwner.TenantId,
+            ownerUserId: otherTenantOwner.Id);
+
+        var currentUser = new User { Id = currentOwner.Id, TenantId = TenantId };
+        currentUser.UserRoles.Add(new UserRole { UserId = currentUser.Id, RoleName = RoleNames.User });
+        var service = CreateService(dbContext, currentUser);
+
+        var results = await service.SearchAsync("accessmarker", topK: 3);
+
+        Assert.AreEqual(1, results.Count);
+        Assert.AreEqual(allowed.ChunkId, results[0].ChunkId);
+        Assert.AreEqual(allowed.DocumentId, results[0].DocumentId);
+        Assert.IsTrue(results[0].FoundByVectorSearch);
+        Assert.IsTrue(results[0].FoundByFullTextSearch);
+    }
+
     private static ApplicationDbContext CreateDbContext()
     {
         return new ApplicationDbContext(TestDbContextOptions.Create());
     }
 
-    private static HybridSearchService CreateService(ApplicationDbContext dbContext)
+    private static HybridSearchService CreateService(ApplicationDbContext dbContext, User? currentUser = null)
     {
-        var currentUser = new User { TenantId = TenantId };
-        currentUser.UserRoles.Add(new UserRole
+        currentUser ??= new User { TenantId = TenantId };
+        if (currentUser.UserRoles.Count == 0)
         {
-            UserId = currentUser.Id,
-            RoleName = RoleNames.PowerUser
-        });
+            currentUser.UserRoles.Add(new UserRole
+            {
+                UserId = currentUser.Id,
+                RoleName = RoleNames.PowerUser
+            });
+        }
+
         var documentAccessService = new FakeDocumentAccessService(currentUser);
         var vectorSearchService = new VectorSearchService(
             dbContext,
@@ -100,15 +144,18 @@ public sealed class PostgreSqlHybridSearchServiceTests : PostgreSqlTestClassBase
         var overlap = await AddCandidateAsync(
             dbContext,
             "hybridmarker overlap full text",
-            new[] { 0.8f, 0.6f });
+            new[] { 1f, 0f },
+            chunkId: Guid.Parse("00000000-0000-0000-0000-000000000002"));
         var vectorOnly = await AddCandidateAsync(
             dbContext,
             "vector only candidate",
-            new[] { 1f, 0f });
+            new[] { 0.8f, 0.6f },
+            chunkId: Guid.Parse("00000000-0000-0000-0000-000000000003"));
         var fullTextOnly = await AddCandidateAsync(
             dbContext,
             "hybridmarker full text only",
-            embedding: null);
+            embedding: null,
+            chunkId: Guid.Parse("00000000-0000-0000-0000-000000000001"));
 
         return new CandidateFixture(
             overlap.ChunkId,
@@ -120,7 +167,10 @@ public sealed class PostgreSqlHybridSearchServiceTests : PostgreSqlTestClassBase
     private static async Task<(Guid ChunkId, Guid DocumentId)> AddCandidateAsync(
         ApplicationDbContext dbContext,
         string content,
-        float[]? embedding)
+        float[]? embedding,
+        Guid? chunkId = null,
+        string tenantId = TenantId,
+        Guid? ownerUserId = null)
     {
         var document = new Document
         {
@@ -129,10 +179,12 @@ public sealed class PostgreSqlHybridSearchServiceTests : PostgreSqlTestClassBase
             FileName = "hybrid-search.txt",
             ContentType = "text/plain",
             FileSize = content.Length,
-            TenantId = TenantId
+            TenantId = tenantId,
+            OwnerUserId = ownerUserId
         };
         var chunk = new DocumentChunk
         {
+            Id = chunkId ?? Guid.NewGuid(),
             DocumentId = document.Id,
             Content = content,
             CharacterCount = content.Length
