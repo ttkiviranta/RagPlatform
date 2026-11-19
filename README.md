@@ -126,7 +126,7 @@ CI runs the unit and PostgreSQL test categories in separate workflows. Live Foun
 
 - Executed in GitHub Actions on every push and pull request.
 - Category: `Unit`
-- Current count: 54 tests
+- Current count: 58 tests
 
 ```bash
 dotnet test --filter "TestCategory=Unit"
@@ -138,7 +138,7 @@ dotnet test --filter "TestCategory=Unit"
 - Uses PostgreSQL with pgvector.
 - Applies EF Core migrations automatically.
 - Category: `PostgreSql`
-- Current count: 55 tests
+- Current count: 66 tests
 
 ```bash
 dotnet test --filter "TestCategory=PostgreSql"
@@ -156,12 +156,12 @@ dotnet test --filter "TestCategory=PostgreSql"
 ### Current Status
 
 - ✅ GitHub Actions CI enabled
-- ✅ Unit tests passing (54/54)
-- ✅ PostgreSQL integration tests passing (55/55)
+- ✅ Unit tests passing (58/58)
+- ✅ PostgreSQL integration tests passing (66/66)
 - ✅ EF Core migrations validated in CI
 - ✅ pgvector integration validated in CI
 
-**Total automated tests: 109**
+**Total automated tests: 124**
 
 ## API surface
 
@@ -174,6 +174,7 @@ The API includes document CRUD and upload, URL import, document processing/metad
 - Vector Search (pgvector)
 - PostgreSQL Full-Text Search
 - FullTextSearchService
+- HybridSearchService
 - Document Ingestion Pipeline
 - Semantic Search
 - Citations
@@ -183,11 +184,11 @@ The API includes document CRUD and upload, URL import, document processing/metad
 
 ### In Progress
 
-- Hybrid Search
+- Reciprocal Rank Fusion (RRF)
 
 ### Planned
 
-- Reciprocal Rank Fusion (RRF)
+- Hybrid Search API
 - RAG retrieval backed by Hybrid Search
 - Reranking
 - Search quality evaluation
