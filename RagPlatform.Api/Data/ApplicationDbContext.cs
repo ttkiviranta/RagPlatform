@@ -120,6 +120,12 @@ public sealed class ApplicationDbContext : DbContext
                 .IsRequired();
             entity.Property(chunk => chunk.Content)
                 .IsRequired();
+            entity.HasGeneratedTsVectorColumn(
+                chunk => chunk.SearchVector,
+                "english",
+                chunk => chunk.Content);
+            entity.HasIndex(chunk => chunk.SearchVector)
+                .HasMethod("GIN");
             entity.Property(chunk => chunk.CharacterCount)
                 .IsRequired();
             entity.Property(chunk => chunk.CreatedAt)

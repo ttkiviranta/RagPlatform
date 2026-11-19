@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Serialization;
+using NpgsqlTypes;
 
 namespace RagPlatform.Api.Models;
 
@@ -14,6 +15,9 @@ public sealed class DocumentChunk
     public int ChunkIndex { get; set; }
 
     public string Content { get; set; } = string.Empty;
+
+    [JsonIgnore]
+    public NpgsqlTsVector SearchVector { get; set; } = null!;
 
     public int CharacterCount { get; set; }
 
