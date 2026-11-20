@@ -177,6 +177,53 @@ dotnet test --filter "TestCategory=PostgreSql"
 
 **Total automated tests: 129**
 
+## Phase 12 Validation Results
+
+### Validated Capabilities
+
+- PDF upload
+- Service Bus message publishing
+- Document Import Background Worker
+- PDF text extraction
+- Chunk generation
+- Azure AI Foundry embedding generation
+- PostgreSQL + pgvector storage
+- Vector similarity search
+
+### Evaluation Corpus
+
+- identity-security.pdf
+- azure-servicebus.pdf
+- postgresql-pgvector.pdf
+- employment-policy.pdf
+- hybrid-search-demo.pdf
+
+### Validation Results
+
+| Query | Expected Document | Result |
+|---------|---------|---------|
+| dead-letter queue | azure-servicebus | PASS |
+| OAuth 2.0 | identity-security | PASS |
+| HNSW | postgresql-pgvector | PASS |
+| notice period | employment-policy | PASS |
+| reciprocal rank fusion | hybrid-search-demo | PASS |
+| how does the system stop one organization from reading another organization's files? | identity-security | PASS |
+
+### Notes
+
+- All five evaluation PDFs successfully reached Completed status.
+- Document chunk generation succeeded.
+- Embeddings were generated using Azure AI Foundry deployment text-embedding-ada-002.
+- Vector search returned the expected document as the highest-ranked result for all validation queries.
+- Semantic retrieval successfully matched natural-language questions to relevant content without relying solely on exact keywords.
+- copilot.pdf failed extraction with NoExtractableText and was dead-lettered, which is expected behavior for a permanent extraction failure.
+
+### Conclusion
+
+Phase 12 end-to-end validation was completed successfully. The ingestion pipeline, embedding generation pipeline, and VectorSearchService all function correctly against the validation corpus.
+
+This corpus validation does not by itself close the remaining Phase 12 acceptance and rollout gates.
+
 ## API surface
 
 The API includes document CRUD and upload, URL import, document processing/metadata, chunks and embeddings, vector search, RAG query, conversations/messages, and document import status. OpenAPI/Swagger is the interactive API reference when the service is running.
