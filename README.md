@@ -6,7 +6,8 @@ A backend-first document ingestion and retrieval-augmented question-answering pl
 
 - ✅ **Phases 1–11 completed and validated.** Validation depth and archived evidence vary by phase; see the [phase archive](docs/README.md).
 - ✅ **Phase 12 implemented and documented.**
-- ⚠️ **Phase 12 acceptance validation pending.** PostgreSQL/pgvector integration and isolated Service Bus end-to-end validation remain open. The import worker stays disabled until rollout gates pass.
+- ✅ **Phase 12 functional validation:** PDF ingestion, Service Bus processing, PostgreSQL/pgvector integration, Foundry embeddings, and vector retrieval have been validated against the evaluation corpus.
+- ⚠️ **Phase 12 rollout acceptance pending.** The functional results do not establish all failure, recovery, isolation, and operational gates. The import worker remains disabled by default and outside approved validation environments until rollout gates pass.
 - ✅ **Phase 13 implemented and documented.**
 - ⚠️ **Phase 13 acceptance validation pending.** Database, live Foundry, quality/security, performance/cost, retention, and rollout evidence remain open.
 
@@ -220,9 +221,21 @@ dotnet test --filter "TestCategory=PostgreSql"
 
 ### Conclusion
 
-Phase 12 end-to-end validation was completed successfully. The ingestion pipeline, embedding generation pipeline, and VectorSearchService all function correctly against the validation corpus.
+The end-to-end ingestion and vector retrieval path was successfully validated against the evaluation corpus. This demonstrates the tested functional scenarios, not every Phase 12 acceptance scenario.
 
-This corpus validation does not by itself close the remaining Phase 12 acceptance and rollout gates.
+### Remaining Phase 12 Acceptance Evidence
+
+The following criteria remain open unless supported by separately reviewed evidence:
+
+- Fresh and supported upgrade migration paths, plus coverage of transaction atomicity, completion evidence, row locking, model/dimension mismatches, and concurrent processing.
+- A traceable upload-to-broker-completion run on confirmed isolated resources, including status and audit records, settlement order, and staging-Blob deletion.
+- Completed-message redelivery, transient retry, poison-envelope dead-lettering, and interruption between database completion and broker settlement, with no duplicate artifacts.
+- Full permanent-PDF failure evidence, including persisted Failed status and audit. The observed `copilot.pdf` dead-letter result covers part of this scenario.
+- Verified import-status responses for both completion and failure.
+- Dedicated test resources and least-privilege identity permissions; demonstrated queue/DLQ monitoring, alerts, and content-safe logs.
+- An approved approach for failed or abandoned staging Blobs, an exercised disable/rollback procedure, and rollout-owner approval.
+
+Record sanitized evidence and review results against the [Phase 12 acceptance plan](docs/phases/phase12/acceptance-validation-plan.md). Older validation reports may not yet reflect the corpus results above.
 
 ## API surface
 
@@ -258,7 +271,7 @@ The API includes document CRUD and upload, URL import, document processing/metad
 
 ## Next steps
 
-Complete and record the Phase 12 PostgreSQL/pgvector and isolated Service Bus rollout gates, then complete Phase 13 database, live Foundry, answer-quality, security, and operational acceptance. The previously identified Phase 14–17 themes (Copilot Studio integration, GraphRAG, administration, and AI engineering/operations) remain roadmap items rather than current implementation scope; the proposed sequencing below is not yet approved.
+Complete and record the remaining Phase 12 recovery, isolation, evidence, and operational rollout gates, then complete Phase 13 database, live Foundry, answer-quality, security, and operational acceptance. The previously identified Phase 14–17 themes (Copilot Studio integration, GraphRAG, administration, and AI engineering/operations) remain roadmap items rather than current implementation scope; the proposed sequencing below is not yet approved.
 
 ### Proposed roadmap alignment (not yet approved)
 
