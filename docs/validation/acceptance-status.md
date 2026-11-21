@@ -10,7 +10,7 @@
 | 10C | Complete/validated | User A conversation access; User B denied/404; Postman workflow | Archived raw test output is absent |
 | 10D | Complete/validated | Audit events persisted with expected outcomes/targets | Query API, retention/purge, and governance reporting are out of scope |
 | 11 | Complete/validated | Foundry auth, embedding/vector flow, grounded chat, scoping, and audit | Current deployment identifiers and model evaluation data are not archived |
-| 12 | Implementation complete; acceptance and rollout pending | Successful builds and upload/message-publish evidence are documented | PG-01 is blocked by workstation Smart App Control; PostgreSQL/pgvector integration and isolated Service Bus E2E validation, including settlement/retry/DLQ evidence, remain |
+| 12 | Implementation complete; functional validation complete; rollout acceptance pending | Successful PDF upload/processing, chunk/embedding persistence, PostgreSQL/pgvector retrieval, vector/full-text/hybrid/semantic retrieval, and the five-PDF corpus are documented | Formal fresh/upgrade migration, transaction/locking/isolation integration evidence and isolated Service Bus recovery/settlement/DLQ/operational evidence remain |
 | 13 | Implementation complete; acceptance pending | Full solution build; five focused prompt/evidence/failure-telemetry tests pass; retrieval and answer telemetry implemented | Database-backed validation is gated by PG-01; live Foundry, prompt-injection, quality/performance, retention, and rollout evidence also remain |
 
 See the [combined Phase 12-13 validation roadmap](phase12-phase13-validation-roadmap.md) for execution environments, validation order, and production-readiness assessment.
@@ -53,4 +53,4 @@ EF Core InMemory does not map `Pgvector.Vector`; the documented test failures oc
 
 ## Evidence quality note
 
-The README's completion markers and summaries are retained as repository-reported status. They are not upgraded here into new test results. No CI test reports, database integration test output, queue test logs, or formal retrospective files were found in the repository.
+The README's functional-validation section records the five-PDF retrieval corpus and is retained as repository-reported evidence. It is not substituted for formal acceptance evidence. No formal CI/acceptance report, database transaction test output, queue recovery/DLQ test logs, or signed retrospective was found in the repository.

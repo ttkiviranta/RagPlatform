@@ -4,7 +4,7 @@
 
 This plan captures the previously requested Phase 12 acceptance-validation scope using the available conversation summary and repository records. It specifies the minimum evidence required before enabling the document import worker. It is a plan, not proof that validation has passed.
 
-Tasks 1-9 are implemented. The worker must remain disabled (`ServiceBus:DocumentImportWorkerEnabled=false`) until PostgreSQL/pgvector integration checks and the isolated Service Bus end-to-end sequence pass and their evidence is reviewed.
+Tasks 1-9 are implemented. Functional validation has confirmed successful PDF upload and worker processing, extraction, chunking, Azure AI Foundry embeddings, PostgreSQL/pgvector persistence, and vector/full-text/hybrid retrieval across five evaluation PDFs. The worker must remain disabled (`ServiceBus:DocumentImportWorkerEnabled=false`) until formal PostgreSQL transaction/locking acceptance, isolated Service Bus recovery/settlement evidence, and operational rollout gates pass and are reviewed.
 
 ## 1. Minimal validation before worker enablement
 
@@ -82,7 +82,7 @@ Repeat with controlled failure cases from the isolated queue plan; a single succ
 
 ## 6. Production-readiness assessment
 
-**Not production-ready for worker enablement until validation is complete.** Implementation/build evidence and upload/message-publish evidence do not demonstrate PostgreSQL vector persistence, transactional completion, redelivery idempotency, or Service Bus settlement behavior. Existing InMemory failures occur before meaningful vector assertions and cannot substitute for database integration tests.
+**Not production-ready for worker enablement until formal acceptance is complete.** Functional validation demonstrates the successful happy path for the imported corpus, but it does not by itself demonstrate fresh/upgrade migration acceptance, transactional completion under injected failures, redelivery idempotency, isolated Service Bus retry/DLQ/settlement behavior, or monitored rollout readiness. Existing InMemory failures occur before meaningful vector assertions and cannot substitute for database integration tests.
 
 Additional operational limitations to address or explicitly accept include lock-expiry-based transient retry, cleanup for failed/abandoned staging Blobs, monitoring/alerting readiness, and controlled rollout/rollback ownership.
 

@@ -4,8 +4,9 @@
 
 Phase 12 Tasks 1-9 implement an asynchronous PDF import path from upload through Blob staging, Service Bus delivery, extraction, chunking, embedding persistence, and an evidence-checked completion transition. The completion workflow includes audit records, settlement policy, poison-message handling, and an import-status endpoint.
 
-**Implementation status:** Tasks 1-9 are reported implemented, built, committed, and pushed.
-**Acceptance and rollout status:** Pending PostgreSQL/pgvector integration testing and isolated Service Bus end-to-end validation. Keep the document import worker disabled until those gates pass. This report reconstructs the earlier Phase 12 completion-report request using the available conversation summary, phase documentation, validation notes, and Git history; it does not claim that missing runtime evidence was recovered.
+**Implementation status:** Tasks 1-9 are implemented and the functional PDF import and retrieval path is verified.
+**Functional validation:** PDF upload, Service Bus processing, the document import worker, PDF extraction, chunk generation, Azure AI Foundry embeddings, PostgreSQL/pgvector persistence, vector search, full-text search, hybrid RRF, and semantic retrieval were validated against five evaluation PDFs.
+**Acceptance and rollout status:** Pending recovery, isolation, monitoring, and formal rollout evidence. Keep the document import worker disabled until the remaining acceptance gates pass.
 
 ## Tasks 1-9 summary
 
@@ -44,10 +45,10 @@ Related schema migrations are `20261112090000_Phase12DocumentImportFoundation` a
 ## Validation status
 
 - Builds are documented as successful for the Phase 12 implementation tasks.
-- The available upload validation documents a successful PDF upload and message publication, with an active queue message. This proves enqueue/publish behavior only, not worker processing or successful import completion.
+- Functional validation exercised successful PDF upload, Service Bus processing, extraction, chunking, embedding generation, PostgreSQL/pgvector persistence, and vector/full-text/hybrid retrieval over five evaluation PDFs.
+- All five evaluation PDFs reached `Completed`; `text-embedding-ada-002` persisted 1536-dimensional pgvector embeddings and the corpus validation retrieved the expected documents.
 - The existing EF Core InMemory test provider cannot map `Pgvector.Vector`; affected tests fail during model initialization before reaching assertions. SQLite is not a substitute for Npgsql/pgvector semantics.
-- PostgreSQL/pgvector integration validation and isolated Service Bus end-to-end processing/settlement validation were not completed in the recorded evidence.
-- No completed isolated-queue result set or production worker enablement evidence was found.
+- Isolated Service Bus recovery/settlement scenarios, formal redelivery and concurrency evidence, monitoring/alerting, and production rollout approval remain open.
 
 ## Known limitations and rollout blockers
 

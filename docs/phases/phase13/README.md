@@ -8,7 +8,7 @@ Provide authenticated document Q&A over the imported corpus. The planned request
 
 - Keep retrieval and authorization in the API, not as model-controlled tools.
 - Apply tenant, owner, document-ACL, and optional document-scope filters in the database query before returning chunks.
-- Start with pgvector similarity search; add hybrid search or reranking only when evaluation demonstrates a benefit.
+- Start with pgvector similarity search; hybrid search and RRF are now implemented and exposed, while RAG answer generation still uses vector retrieval. Reranking remains evaluation-driven.
 - Assign citation labels and source metadata server-side; never trust model-generated document IDs or locations. Abstain when retrieved evidence is insufficient.
 - Keep conversation history application-managed, owner-scoped, bounded, and freshly authorized on each turn.
 - Begin with a deterministic single-agent pipeline; agent orchestration is not required for the initial Q&A feature.
@@ -22,7 +22,7 @@ The associated API build succeeded in the working tree at archive time. The DTO/
 
 ## Increment 2 - authorized vector retrieval
 
-Increment 2 adds an optional document scope to the vector-search request and performs model- and dimension-compatible pgvector cosine ranking in PostgreSQL. Tenant, owner/role access, and optional document filtering are part of the same query. Query vector dimensions are checked before search; model name, persisted dimension metadata, and actual vector dimensions are checked before a stored vector can be ranked. This increment does not add answer generation or citation population. See [Increment 2 design and implementation notes](increment02-authorized-vector-retrieval.md).
+Increment 2 adds an optional document scope to the vector-search request and performs model- and dimension-compatible pgvector cosine ranking in PostgreSQL. Tenant, owner/role access, and optional document filtering are part of the same query. Functional vector retrieval was subsequently validated against the five-document evaluation corpus. Query vector dimensions are checked before search; model name, persisted dimension metadata, and actual vector dimensions are checked before a stored vector can be ranked. This increment does not add answer generation or citation population. See [Increment 2 design and implementation notes](increment02-authorized-vector-retrieval.md).
 
 The API build is the compile validation for this increment. Query execution, pgvector SQL translation, and access-filter behavior still require PostgreSQL/pgvector integration tests; EF Core InMemory cannot validate those behaviors.
 

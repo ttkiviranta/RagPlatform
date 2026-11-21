@@ -2,9 +2,9 @@
 
 ## Executive status
 
-Both phases are **implementation complete**, but neither has sufficient recorded acceptance evidence for production rollout. Phase 12's document-import worker must remain disabled until PostgreSQL/pgvector and isolated Service Bus validation passes. Phase 13 requires database, live Foundry, authorization, answer-quality, security, and operational evaluation before broad release.
+Both phases are **implementation complete**. Phase 12 has successful functional import/retrieval evidence, but neither phase has sufficient recorded formal acceptance evidence for production rollout. Phase 12's document-import worker must remain disabled until PostgreSQL/pgvector and isolated Service Bus validation passes. Phase 13 requires database, live Foundry, authorization, answer-quality, security, and operational evaluation before broad release.
 
-The repository records a successful full solution build and five passing focused Phase 13 hardening tests. Phase 12 implementation builds and a PDF upload/message-publish validation are recorded. Those checks do not prove database-backed processing, live message settlement, answer quality, or production readiness. PG-01 is currently blocked by the workstation's enforced Windows Smart App Control `VerifiedAndReputableDesktop` policy (`0283ac0f-fff1-49ae-ada1-8a933130cad6`), which blocks EF design-time execution and other locally generated .NET applications. No RagPlatform defect has been identified; use an approved .NET execution environment to resume runtime validation.
+The repository records a successful full solution build and five passing focused Phase 13 hardening tests. Functional retrieval validation covers vector, full-text, and hybrid RRF search over the five-PDF corpus. Phase 12 implementation builds and a PDF upload/message-publish validation are recorded. Those checks do not prove database-backed processing, live message settlement, answer quality, or production readiness. PG-01 is currently blocked by the workstation's enforced Windows Smart App Control `VerifiedAndReputableDesktop` policy (`0283ac0f-fff1-49ae-ada1-8a933130cad6`), which blocks EF design-time execution and other locally generated .NET applications. No RagPlatform defect has been identified; use an approved .NET execution environment to resume runtime validation.
 
 ## 1. Remaining Phase 12 validation
 
@@ -90,8 +90,8 @@ If a gate fails, stop progression, retain sanitized evidence, fix the root cause
 
 **Current recommendation: NO-GO for production rollout; suitable only for controlled development/validation.**
 
-- **Phase 12 worker:** Not ready for shared/production enablement. PostgreSQL/pgvector persistence/transaction evidence and isolated broker settlement/retry/DLQ evidence are not recorded; the worker is intentionally disabled by default.
-- **Phase 13 Q&A:** Implementation and focused deterministic checks are present, but database authorization/persistence behavior, live Foundry behavior, semantic answer/citation quality, live prompt-injection resilience, performance/cost baselines, and retention operations remain unvalidated.
+- **Phase 12 worker:** Functional PDF, PostgreSQL/pgvector, embedding, and retrieval validation is complete, but shared/production enablement remains not ready until formal transaction/isolation, broker settlement/retry/DLQ, monitoring, and rollback evidence is reviewed; the worker is intentionally disabled by default.
+- **Phase 13 Q&A:** Vector, full-text, hybrid RRF, and semantic retrieval are functionally validated. Database authorization/persistence behavior, live Foundry chat behavior, semantic answer/citation quality, live prompt-injection resilience, performance/cost baselines, and retention operations remain unvalidated.
 - **Combined solution:** End-to-end production readiness is blocked by both phases' runtime evidence and operational gates. Do not infer production readiness from successful builds, unit tests, or upload/message-publish evidence alone.
 
 Readiness can be reassessed only after all applicable gates pass, evidence is reviewed, residual risks have named owners and approval, and a controlled rollout demonstrates stable operation.

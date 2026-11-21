@@ -36,7 +36,7 @@ Retrieval and authorization remain application-controlled; the model does not ch
 
 The query embedding uses the configured provider and exact configured model name. The service validates configured and generated dimensions and excludes stored embeddings with incompatible model names or dimensions. PostgreSQL/pgvector performs cosine-distance ordering and applies Top-K before results are transferred to the API. The current score representation is derived from distance as `clamp(1 - distance, 0, 1)`. Optional document scope, tenant scope, and document access are applied before ranking results are returned.
 
-The API returns ranked chunk results from vector search. The RAG answer flow uses retrieved chunks as evidence and prepares a bounded context for generation. Hybrid search, reranking, and relevance improvements remain future evaluation-driven work.
+The API returns ranked chunk results from vector search. The RAG answer flow currently uses retrieved chunks from vector search and prepares a bounded context for generation. Full-text and hybrid search services are implemented and exposed, and both were validated against the evaluation corpus. Reranking and RAG integration with hybrid retrieval remain separate future design decisions.
 
 ## Answer-generation architecture
 
@@ -76,7 +76,8 @@ These results confirm compilation and the focused deterministic behaviors only. 
 
 ## Known limitations
 
-- Hybrid retrieval, reranking, and relevance tuning have not been implemented; consider them only if evaluation demonstrates a benefit.
+- Hybrid retrieval and RRF are implemented and exposed, but RAG answer generation still uses vector retrieval rather than hybrid retrieval.
+- Reranking and relevance tuning remain future evaluation-driven work.
 - Citation labels are validated syntactically; semantic entailment is not guaranteed. Page numbers are unavailable because the chunk model has no page field.
 - No automatic conversation retention period or purge worker is configured. Data remains until owner deletion or an approved operational purge.
 - Candidate counting adds an additional database query and may increase retrieval cost/latency.

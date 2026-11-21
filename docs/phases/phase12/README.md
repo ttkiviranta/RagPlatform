@@ -2,7 +2,7 @@
 
 ## Status
 
-Tasks 1-9 are implemented, documented, committed, and pushed. Operational acceptance remains pending: PostgreSQL/pgvector integration validation and isolated Service Bus end-to-end validation are not complete. The worker must remain disabled until these rollout gates pass.
+Tasks 1-9 are implemented and the functional import/retrieval path is validated. Operational acceptance remains pending: recovery, concurrency, isolated Service Bus settlement/DLQ, monitoring, and rollout evidence are not complete. The worker must remain disabled until these rollout gates pass.
 
 ## Phase reports and validation plan
 
@@ -38,7 +38,7 @@ These documents reconstruct the requested Phase 12 reporting artifacts from prio
 
 - Migrations: `20261112090000_Phase12DocumentImportFoundation` and `20261113142000_AddEmbeddingBatchAuditMetadata`.
 - Documented staging container: `document-staging`; documented Service Bus queue: `document-import`.
-- The README includes a successful upload/message-publish validation reference (`documentId` `53bb6d68-427e-4806-a39e-ad1d46a50710`; active queue message count `1`). This is publish evidence only, not a completed import acceptance test.
+- Functional validation has confirmed successful upload, worker processing, extraction, chunking, Foundry embeddings, PostgreSQL/pgvector persistence, and vector/full-text/hybrid retrieval over five evaluation PDFs. These results are functional evidence, not the formal recovery, isolation, and rollback acceptance trace.
 - No actual Azure subscription, resource group, storage account, Service Bus namespace, or Foundry resource names are documented.
 - Plan/architecture history: `0259f4d`, `53985c8`, `58f54f0`.
 - Implementation commits: `8dc5ab7` (messaging), `9e13ee5` (consumer), `aa71f6d` (extraction), `9b0bc99` (chunking), `7c641bd` (embedding), `d988f38` (Task 9).
@@ -47,7 +47,8 @@ These documents reconstruct the requested Phase 12 reporting artifacts from prio
 
 - Builds are documented as successful for the implementation tasks.
 - EF Core InMemory cannot map `Pgvector.Vector`; affected tests fail during model initialization before assertions. Those failures do not validate PostgreSQL behavior. SQLite is not a substitute for Npgsql/pgvector semantics.
-- PostgreSQL/pgvector integration tests and isolated Service Bus end-to-end completion, redelivery, retry, and dead-letter validation remain pending.
+- Functional validation confirms PDF processing, chunk/embedding persistence, vector retrieval, full-text retrieval, and hybrid RRF over the evaluation corpus.
+- PostgreSQL transaction/locking/idempotency integration tests and isolated Service Bus end-to-end completion, redelivery, retry, and dead-letter validation remain pending.
 - The processor uses manual settlement, `AutoCompleteMessages = false`, `MaxConcurrentCalls = 1`, and `PrefetchCount = 0`. Transient messages are not explicitly abandoned; retry depends on lock expiry and delivery limits and requires isolated testing.
 - Staging-aware document deletion and abandoned-blob cleanup remain unfinished. Failed PDF imports may retain staging blobs; a Blob lifecycle rule is identified as a cleanup option.
 - Worker configuration is `ServiceBus:DocumentImportWorkerEnabled=false` by default. Do not enable it on a shared or production-like queue before the validation gates pass.

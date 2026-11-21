@@ -2,7 +2,7 @@
 
 ## Purpose and current status
 
-This plan defines the evidence required to accept Phase 13 Document Q&A after implementation increments 1-6. It is a validation plan, not evidence that the checks have already passed. The full solution build and five focused `RagQualityHardeningTests` have passed; PostgreSQL/pgvector behavior, live Azure AI Foundry behavior, answer quality, production-like authorization, and operational thresholds remain to be validated.
+This plan defines the evidence required to accept Phase 13 Document Q&A after implementation increments 1-6. It is a validation plan, not evidence that the checks have already passed. The full solution build and five focused `RagQualityHardeningTests` have passed. Functional vector, full-text, and hybrid RRF retrieval have also been validated over five PDFs; PostgreSQL authorization/persistence behavior, live Foundry chat behavior, answer quality, production-like authorization, and operational thresholds remain to be validated.
 
 Do not mark Phase 13 accepted or enable general availability until the required gates below have recorded results, owners, environment/configuration, and any approved exceptions.
 

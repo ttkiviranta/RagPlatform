@@ -22,9 +22,9 @@ The project should remain **implementation complete; acceptance pending**. PG-01
 | --- | --- | --- |
 | Recorded successful solution/API builds | The documented code revisions compiled successfully at the time of those builds. | EF design-time assembly loading, migrations, or runtime integration behavior. |
 | Five focused Phase 13 hardening tests recorded as passing | The focused prompt/evidence/failure-telemetry behaviors documented for those tests passed in that recorded run. | Database-backed retrieval, live Foundry behavior, answer quality, security acceptance, or current testhost operability. |
-| Phase 12 PDF upload/message-publish validation recorded | The upload and message-publish boundary was exercised. | Worker completion, persisted embeddings/audits, broker settlement, retry, or DLQ behavior. |
+| Phase 12 functional ingestion/retrieval validation | PDF upload, worker processing, extraction, chunking, Foundry embeddings, PostgreSQL/pgvector persistence, vector/full-text/hybrid retrieval, and semantic retrieval over five PDFs were exercised. | Formal recovery/retry/DLQ/transaction/isolation and production rollout evidence remain open. |
 | PostgreSQL/pgvector prerequisites | PostgreSQL 16.15 and pgvector 0.8.7 were verified; PostgreSQL startup/readiness was checked. | Fresh/upgrade migration execution or Phase 12/13 integration acceptance. |
-| Migration and database inspection | The source chain contains 16 migrations. The existing `ragplatform` database has the first 14 applied through `20261112090000_Phase12DocumentImportFoundation`; it has 11 public tables. | Migration application from empty state or upgrade to the latest schema. The existing database is not a fresh test database and must remain untouched. |
+| Migration and database inspection | The source chain contains 16 migrations and database inspection confirms the local migration history is current through migration `20261119030523_AddDocumentChunkSearchVector`. | Formal fresh/upgrade migration acceptance tests and separate disposable migration evidence remain open. The existing database is not a fresh test database and must remain untouched for PG-01 evidence. |
 | Smart App Control / Code Integrity evidence | `SmartAppControlState=On`; the enforced policy ID matches Code Integrity events. Events show EF's `dotnet.exe`, `testhost`, and `vstest` load attempts blocked. A separately generated .NET 10 Hello World application also failed with an Application Control block. | That every .NET application is blocked, or that every policy decision has an independently collected event record. |
 | Application defect review | No RagPlatform application defect has been identified as the cause of the EF failure. | Correctness of the unexecuted acceptance scenarios. |
 
@@ -55,7 +55,7 @@ After the current schema is validated, exercise pgvector ordering and authorizat
 ### Environment risks
 
 - The current workstation's enforced Smart App Control policy blocks the .NET execution paths needed by EF and the test hosts; local runtime validation is therefore unavailable in this environment.
-- The current database is already migrated through 14 of 16 migrations and is not suitable for a fresh migration test. Do not reset or modify it for PG-01.
+- The existing local `ragplatform` database is suitable for read/functional inspection but is not a fresh migration test database. Do not reset or modify it for PG-01.
 - An alternate execution environment must be explicitly approved, isolated, and able to run the selected application revision. Its database and Azure resources must be non-production and disposable where applicable.
 
 ## Value of further work on this workstation

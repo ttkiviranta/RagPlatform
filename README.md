@@ -6,7 +6,7 @@ A backend-first document ingestion and retrieval-augmented question-answering pl
 
 - ✅ **Phases 1–11 completed and validated.** Validation depth and archived evidence vary by phase; see the [phase archive](docs/README.md).
 - ✅ **Phase 12 implemented and documented.**
-- ✅ **Phase 12 functional validation:** PDF ingestion, Service Bus processing, PostgreSQL/pgvector integration, Foundry embeddings, and vector retrieval have been validated against the evaluation corpus.
+- ✅ **Phase 12 functional validation:** PDF ingestion, Service Bus processing, PostgreSQL/pgvector integration, Foundry embeddings, vector retrieval, full-text retrieval, hybrid retrieval, and semantic retrieval have been validated against the evaluation corpus.
 - ⚠️ **Phase 12 rollout acceptance pending.** The functional results do not establish all failure, recovery, isolation, and operational gates. The import worker remains disabled by default and outside approved validation environments until rollout gates pass.
 - ✅ **Phase 13 implemented and documented.**
 - ⚠️ **Phase 13 acceptance validation pending.** Database, live Foundry, quality/security, performance/cost, retention, and rollout evidence remain open.
@@ -17,7 +17,7 @@ Current capabilities include:
 
 - PDF ingestion with temporary Azure Blob Storage staging and Service Bus processing
 - PDF text extraction, chunk generation, and embedding generation
-- PostgreSQL/pgvector storage and similarity retrieval
+- PostgreSQL/pgvector storage, vector similarity retrieval, full-text retrieval, and Reciprocal Rank Fusion hybrid retrieval
 - RAG question answering through Azure AI Foundry
 - Server-validated citations and owner/tenant-scoped conversation history
 - Microsoft Entra ID authentication, application authorization, and durable audit events
@@ -141,7 +141,7 @@ CI runs the unit and PostgreSQL test categories in separate workflows. Live Foun
 
 - Executed in GitHub Actions on every push and pull request.
 - Category: `Unit`
-- Current count: 62 tests
+- Previously reported baseline: 62 tests, before the search endpoint tests.
 
 ```bash
 dotnet test --filter "TestCategory=Unit"
@@ -171,12 +171,12 @@ dotnet test --filter "TestCategory=PostgreSql"
 ### Current Status
 
 - ✅ GitHub Actions CI enabled
-- ✅ Unit tests passing (62/62)
+- ✅ Previously reported unit test baseline: 62/62 passed, before the search endpoint tests
 - ✅ PostgreSQL integration tests passing (67/67)
 - ✅ EF Core migrations validated in CI
 - ✅ pgvector integration validated in CI
 
-**Total automated tests: 129**
+The previously reported total was 129 automated tests before the search endpoint tests.
 
 ## Phase 12 Validation Results
 
@@ -190,6 +190,9 @@ dotnet test --filter "TestCategory=PostgreSql"
 - Azure AI Foundry embedding generation
 - PostgreSQL + pgvector storage
 - Vector similarity search
+- Full-text search
+- Hybrid search with Reciprocal Rank Fusion
+- Semantic retrieval
 
 ### Evaluation Corpus
 
@@ -210,25 +213,40 @@ dotnet test --filter "TestCategory=PostgreSql"
 | reciprocal rank fusion | hybrid-search-demo | PASS |
 | how does the system stop one organization from reading another organization's files? | identity-security | PASS |
 
+**Additional full-text validation**
+
+| Query | Expected Document | Result |
+|---------|---------|---------|
+| OAuth 2.0 | identity-security | PASS |
+| dead-letter queue | azure-servicebus | PASS |
+
+**Additional hybrid validation**
+
+- `dead-letter queue` correctly merged vector and full-text results for `azure-servicebus`.
+- The semantic authorization question returned `identity-security`.
+- `FoundByVectorSearch` and `FoundByFullTextSearch` were both verified for the overlap result.
+
 ### Notes
 
 - All five evaluation PDFs successfully reached Completed status.
 - Document chunk generation succeeded.
 - Embeddings were generated using Azure AI Foundry deployment text-embedding-ada-002.
 - Vector search returned the expected document as the highest-ranked result for all validation queries.
+- Full-text search returned the expected document for exact/keyword-oriented queries.
+- Hybrid search fused overlapping vector and full-text candidates using the existing Reciprocal Rank Fusion implementation.
 - Semantic retrieval successfully matched natural-language questions to relevant content without relying solely on exact keywords.
 - copilot.pdf failed extraction with NoExtractableText and was dead-lettered, which is expected behavior for a permanent extraction failure.
 
 ### Conclusion
 
-The end-to-end ingestion and vector retrieval path was successfully validated against the evaluation corpus. This demonstrates the tested functional scenarios, not every Phase 12 acceptance scenario.
+The end-to-end ingestion, embedding, vector retrieval, full-text retrieval, hybrid retrieval, and semantic retrieval paths were successfully validated against the evaluation corpus. This demonstrates the tested functional scenarios, not every rollout or recovery acceptance scenario.
 
 ### Remaining Phase 12 Acceptance Evidence
 
 The following criteria remain open unless supported by separately reviewed evidence:
 
 - Fresh and supported upgrade migration paths, plus coverage of transaction atomicity, completion evidence, row locking, model/dimension mismatches, and concurrent processing.
-- A traceable upload-to-broker-completion run on confirmed isolated resources, including status and audit records, settlement order, and staging-Blob deletion.
+- The remaining acceptance trace on confirmed isolated resources must cover correlation/audit/settlement evidence, staging-Blob deletion, and repository-preserved evidence beyond the successful functional run.
 - Completed-message redelivery, transient retry, poison-envelope dead-lettering, and interruption between database completion and broker settlement, with no duplicate artifacts.
 - Full permanent-PDF failure evidence, including persisted Failed status and audit. The observed `copilot.pdf` dead-letter result covers part of this scenario.
 - Verified import-status responses for both completion and failure.
@@ -241,6 +259,8 @@ Record sanitized evidence and review results against the [Phase 12 acceptance pl
 
 The API includes document CRUD and upload, URL import, document processing/metadata, chunks and embeddings, vector search, RAG query, conversations/messages, and document import status. OpenAPI/Swagger is the interactive API reference when the service is running.
 
+Search endpoints include `POST /api/search/vector`, `POST /api/search/fulltext`, and `POST /api/search/hybrid`. Each accepts `query`, `topK` (1–50, default 5), and an optional `documentId`. Full-text and hybrid searches return arrays of ranked chunks; hybrid results indicate which search sources found each chunk. Hybrid content is a vector snippet for vector-only results and full chunk content for full-text matches. RAG queries continue to use vector search.
+
 ## Roadmap
 
 ### Completed
@@ -249,6 +269,7 @@ The API includes document CRUD and upload, URL import, document processing/metad
 - PostgreSQL Full-Text Search
 - FullTextSearchService
 - HybridSearchService
+- Full-text and hybrid search APIs
 - Reciprocal Rank Fusion (RRF)
 - Document Ingestion Pipeline
 - Semantic Search
@@ -263,7 +284,6 @@ The API includes document CRUD and upload, URL import, document processing/metad
 
 ### Planned
 
-- Hybrid Search API
 - RAG retrieval backed by Hybrid Search
 - Reranking
 - Search quality evaluation
