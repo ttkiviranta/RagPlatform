@@ -37,6 +37,8 @@ using RagPlatform.Api.Swagger;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<FoundryOptions>(
     builder.Configuration.GetSection(FoundryOptions.SectionName));
+builder.Services.Configure<RagOptions>(
+    builder.Configuration.GetSection(RagOptions.SectionName));
 builder.Services.AddSingleton<TokenCredential>(_ => new DefaultAzureCredential());
 builder.Services.AddOptions<BlobStorageOptions>()
     .Bind(builder.Configuration.GetSection(BlobStorageOptions.SectionName))

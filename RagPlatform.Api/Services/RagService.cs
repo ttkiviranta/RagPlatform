@@ -5,12 +5,16 @@ using RagPlatform.Api.Contracts.Identity;
 using RagPlatform.Api.Contracts.Rag;
 using RagPlatform.Api.Contracts.Search;
 using RagPlatform.Api.Contracts.Telemetry;
+using Microsoft.Extensions.Options;
+using RagPlatform.Api.Options;
 
 namespace RagPlatform.Api.Services;
 
 public sealed class RagService : IRagService
 {
     private readonly IVectorSearchService _vectorSearchService;
+    private readonly IHybridSearchService _hybridSearchService;
+    private readonly RagOptions _ragOptions;
     private readonly IRagCitationService _citationService;
     private readonly ITelemetryService _telemetryService;
     private readonly ICurrentUserService _currentUserService;
@@ -21,6 +25,8 @@ public sealed class RagService : IRagService
 
     public RagService(
         IVectorSearchService vectorSearchService,
+        IHybridSearchService hybridSearchService,
+        IOptions<RagOptions> ragOptions,
         IRagCitationService citationService,
         ITelemetryService telemetryService,
         ICurrentUserService currentUserService,
@@ -30,6 +36,8 @@ public sealed class RagService : IRagService
         ILogger<RagService> logger)
     {
         _vectorSearchService = vectorSearchService;
+        _hybridSearchService = hybridSearchService;
+        _ragOptions = ragOptions.Value;
         _citationService = citationService;
         _telemetryService = telemetryService;
         _currentUserService = currentUserService;
@@ -79,10 +87,10 @@ public sealed class RagService : IRagService
                     ?? throw new KeyNotFoundException("Conversation was not found.");
             }
 
-            var searchResponse = await _vectorSearchService.SearchAsync(query, topK, cancellationToken);
-            retrievedChunkCount = searchResponse.Results.Count;
+            var retrievedChunks = await RetrieveAsync(query, topK, cancellationToken);
+            retrievedChunkCount = retrievedChunks.Count;
             var availableCitations = await _citationService.CreateCitationsAsync(
-                searchResponse.Results,
+                retrievedChunks,
                 cancellationToken);
             var answerResult = await _answerGenerationService.GenerateAnswerAsync(
                 query,
@@ -164,6 +172,48 @@ public sealed class RagService : IRagService
             promptCharacterCount: promptCharacterCount);
         await _auditEventWriter.FlushAsync(cancellationToken);
         return response;
+    }
+
+    private async Task<IReadOnlyList<VectorSearchResult>> RetrieveAsync(
+        string query,
+        int topK,
+        CancellationToken cancellationToken)
+    {
+        if (!_ragOptions.UseHybridSearch)
+        {
+            var vectorResponse = await _vectorSearchService.SearchAsync(query, topK, cancellationToken);
+            return vectorResponse.Results;
+        }
+
+        try
+        {
+            var hybridResults = await _hybridSearchService.SearchAsync(query, topK, cancellationToken);
+            if (hybridResults.Count > 0)
+            {
+                return hybridResults
+                    .Select(result => new VectorSearchResult
+                    {
+                        DocumentId = result.DocumentId,
+                        ChunkId = result.ChunkId,
+                        SimilarityScore = 0,
+                        ContentSnippet = result.Content
+                    })
+                    .ToList();
+            }
+
+            _logger.LogWarning("Hybrid search returned no results; falling back to vector search.");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Hybrid search failed; falling back to vector search.");
+        }
+
+        var fallbackResponse = await _vectorSearchService.SearchAsync(query, topK, cancellationToken);
+        return fallbackResponse.Results;
     }
 
 }

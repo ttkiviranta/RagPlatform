@@ -8,7 +8,7 @@ Provide authenticated document Q&A over the imported corpus. The planned request
 
 - Keep retrieval and authorization in the API, not as model-controlled tools.
 - Apply tenant, owner, document-ACL, and optional document-scope filters in the database query before returning chunks.
-- Start with pgvector similarity search; hybrid search and RRF are now implemented and exposed, while RAG answer generation still uses vector retrieval. Reranking remains evaluation-driven.
+- Start with pgvector similarity search; hybrid search and RRF are implemented and exposed. RAG retrieval defaults to vector search and can enable hybrid RRF through `Rag:UseHybridSearch`, with vector fallback on failure or empty hybrid results. Reranking remains evaluation-driven.
 - Assign citation labels and source metadata server-side; never trust model-generated document IDs or locations. Abstain when retrieved evidence is insufficient.
 - Keep conversation history application-managed, owner-scoped, bounded, and freshly authorized on each turn.
 - Begin with a deterministic single-agent pipeline; agent orchestration is not required for the initial Q&A feature.

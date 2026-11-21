@@ -1,0 +1,8 @@
+namespace RagPlatform.Api.Options;
+
+public sealed class RagOptions
+{
+    public const string SectionName = "Rag";
+
+    public bool UseHybridSearch { get; set; } = false;
+}

@@ -259,7 +259,9 @@ Record sanitized evidence and review results against the [Phase 12 acceptance pl
 
 The API includes document CRUD and upload, URL import, document processing/metadata, chunks and embeddings, vector search, RAG query, conversations/messages, and document import status. OpenAPI/Swagger is the interactive API reference when the service is running.
 
-Search endpoints include `POST /api/search/vector`, `POST /api/search/fulltext`, and `POST /api/search/hybrid`. Each accepts `query`, `topK` (1–50, default 5), and an optional `documentId`. Full-text and hybrid searches return arrays of ranked chunks; hybrid results indicate which search sources found each chunk. Hybrid content is a vector snippet for vector-only results and full chunk content for full-text matches. RAG queries continue to use vector search.
+Search endpoints include `POST /api/search/vector`, `POST /api/search/fulltext`, and `POST /api/search/hybrid`. Each accepts `query`, `topK` (1–50, default 5), and an optional `documentId`. Full-text and hybrid searches return arrays of ranked chunks; hybrid results indicate which search sources found each chunk. Hybrid content is a vector snippet for vector-only results and full chunk content for full-text matches.
+
+RAG retrieval is controlled by `Rag:UseHybridSearch`. It defaults to `false`, preserving vector-only RAG behavior. When enabled, RAG uses hybrid RRF retrieval; hybrid exceptions or empty results fall back to vector retrieval. Request cancellation is always propagated without fallback.
 
 ## Roadmap
 
