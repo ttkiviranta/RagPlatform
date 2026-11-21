@@ -44,6 +44,7 @@ EF Core InMemory does not map `Pgvector.Vector`; the documented test failures oc
 
 ## Phase 13 required acceptance evidence
 
+- Execute and archive the [Phase 13 answer-quality validation plan](phase13-answer-quality-validation-plan.md), including the existing five-PDF corpus, gold answers/citations, abstention, prompt-injection, and cross-tenant cases.
 - A representative question set with retrieval relevance and grounded-answer evaluation.
 - Cross-user and cross-tenant tests proving unauthorized chunks never enter the prompt or citation output.
 - Tests for missing evidence/abstention, invalid citation labels, and prompt-injection text in retrieved documents.

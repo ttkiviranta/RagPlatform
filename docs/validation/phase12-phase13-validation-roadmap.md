@@ -75,6 +75,7 @@ The repository's `docker-compose.yml` provides a local PostgreSQL 16/pgvector se
 ### Gate 5 — Phase 13 functional and security validation
 
 - Use the imported test corpus and execute retrieval/citation/conversation tests, including multi-user and cross-tenant cases.
+- Execute the [Phase 13 answer-quality validation plan](phase13-answer-quality-validation-plan.md) for gold answers, citation entailment, abstention, prompt-injection, and cross-tenant cases.
 - Validate the live Foundry chat path for success, abstention, timeout/failure, citation rejection, token usage, and safe persistence behavior.
 - Run prompt-injection and output/citation checks with synthetic malicious content; any unauthorized disclosure is a stop condition.
 
