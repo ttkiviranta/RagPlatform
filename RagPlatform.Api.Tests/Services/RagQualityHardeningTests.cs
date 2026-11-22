@@ -187,7 +187,7 @@ public sealed class RagQualityHardeningTests
         };
     }
 
-    private sealed class CapturingChatCompletionService : IFoundryChatCompletionService
+    internal sealed class CapturingChatCompletionService : IFoundryChatCompletionService
     {
         public string? SystemPrompt { get; private set; }
 
