@@ -125,16 +125,16 @@ public sealed class PostgreSqlRagEvaluationTests : PostgreSqlTestClassBase
         var messages = await dbContext.ConversationMessages
             .AsNoTracking()
             .Where(message => message.ConversationId == response.ConversationId)
-            .OrderBy(message => message.Role)
             .ToListAsync();
         Assert.AreEqual(2, messages.Count);
-        Assert.AreEqual(ConversationMessageRole.User, messages.Single(message => message.Role == ConversationMessageRole.User).Role);
-        Assert.AreEqual("What is the synthetic answer?", messages.Single(message => message.Role == ConversationMessageRole.User).Content);
-        Assert.AreEqual("Synthetic answer [1].", messages.Single(message => message.Role == ConversationMessageRole.Assistant).Content);
+        var userMessage = messages.Single(message => message.Role == ConversationMessageRole.User);
+        var assistantMessage = messages.Single(message => message.Role == ConversationMessageRole.Assistant);
+        Assert.AreEqual("What is the synthetic answer?", userMessage.Content);
+        Assert.AreEqual("Synthetic answer [1].", assistantMessage.Content);
 
         var persistedCitation = await dbContext.ConversationCitations
             .AsNoTracking()
-            .SingleAsync(citation => citation.ConversationMessageId == messages.Single(message => message.Role == ConversationMessageRole.Assistant).Id);
+            .SingleAsync(citation => citation.ConversationMessageId == assistantMessage.Id);
         Assert.AreEqual(persisted.Document.Id, persistedCitation.DocumentId);
         Assert.AreEqual(persisted.Chunk.Id, persistedCitation.ChunkId);
         Assert.AreEqual("Synthetic allowed answer evidence.", persistedCitation.Excerpt);
@@ -186,9 +186,10 @@ public sealed class PostgreSqlRagEvaluationTests : PostgreSqlTestClassBase
         Assert.AreEqual(accessible.Chunk.Id, response.Citations[0].ChunkId);
         Assert.IsFalse(response.Citations.Any(citation => citation.SourceName == "secret.txt"));
 
-        var assistantMessage = await dbContext.ConversationMessages
+        var persistedMessages = await dbContext.ConversationMessages
             .AsNoTracking()
-            .SingleAsync(message => message.Role == ConversationMessageRole.Assistant);
+            .ToListAsync();
+        var assistantMessage = persistedMessages.Single(message => message.Role == ConversationMessageRole.Assistant);
         var snapshots = await dbContext.ConversationCitations
             .AsNoTracking()
             .Where(citation => citation.ConversationMessageId == assistantMessage.Id)
