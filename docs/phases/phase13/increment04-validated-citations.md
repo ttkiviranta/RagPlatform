@@ -10,7 +10,7 @@ This increment adds server-assigned citation labels to retrieved evidence, valid
 
 The model receives only numbered excerpts built from persisted chunk text. Source names are taken from persisted file name or title; document IDs and chunk IDs are copied from persisted records. The API does not parse or trust model-provided IDs, page numbers, URLs, filenames, or source metadata. `DocumentChunk` currently has no page-number field, so `PageNumber` is `null`.
 
-Excerpts are whitespace/control-character normalized and capped at 500 characters. Source names are normalized and capped at 200 characters. Only sources whose labels were actually included in the bounded prompt and cited in the validated answer are returned.
+Excerpts are whitespace/control-character normalized and capped at 500 UTF-16 code units, including a trailing `...` when shortened. The prefix is shortened if necessary to avoid splitting a surrogate pair. Truncation affects only the excerpt sent to the model, returned in the response, and stored in the citation snapshot; the original persisted chunk and audit information are not truncated. Source names are normalized and capped at 200 characters. Only sources whose labels were actually included in the bounded prompt and cited in the validated answer are returned.
 
 ## Prompt and label validation
 

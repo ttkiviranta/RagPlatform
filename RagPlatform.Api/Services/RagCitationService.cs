@@ -99,7 +99,15 @@ public sealed class RagCitationService : IRagCitationService
         var normalized = Normalize(content);
         if (normalized.Length > MaxExcerptCharacters)
         {
-            normalized = normalized[..MaxExcerptCharacters].TrimEnd() + "...";
+            const string ellipsis = "...";
+            var prefixLength = MaxExcerptCharacters - ellipsis.Length;
+            if (char.IsHighSurrogate(normalized[prefixLength - 1])
+                && char.IsLowSurrogate(normalized[prefixLength]))
+            {
+                prefixLength--;
+            }
+
+            normalized = normalized[..prefixLength].TrimEnd() + ellipsis;
         }
 
         return normalized;

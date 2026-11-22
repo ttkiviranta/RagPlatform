@@ -142,6 +142,42 @@ public sealed class PostgreSqlRagEvaluationTests : PostgreSqlTestClassBase
     }
 
     [TestMethod]
+    [DataRow(499, false)]
+    [DataRow(500, false)]
+    [DataRow(501, false)]
+    [DataRow(1200, false)]
+    [DataRow(502, true)]
+    public async Task RagQuery_CitationExcerptFitsSnapshotAndPersistsAudit(int contentLength, bool splitSurrogatePair)
+    {
+        using var dbContext = CreateDbContext();
+        var owner = await AddUserAsync(dbContext, "evaluation-excerpt-tenant", RoleNames.User);
+        var content = splitSurrogatePair
+            ? new string('x', 496) + "\U0001F600" + new string('x', contentLength - 498)
+            : new string('x', contentLength);
+        var expectedExcerpt = contentLength <= 500
+            ? content
+            : new string('x', splitSurrogatePair ? 496 : 497) + "...";
+        var persisted = await AddDocumentAsync(dbContext, owner, content, "long-evidence.txt");
+        var answer = new RecordingAnswerGenerationService(new GroundedAnswerResult(
+            "Synthetic answer [1].",
+            [1],
+            500,
+            600));
+        var service = CreateRagService(dbContext, owner, [ToSearchResult(persisted)], answer);
+
+        var response = await service.QueryAsync("What is the synthetic answer?");
+
+        Assert.AreEqual(expectedExcerpt, answer.ReceivedCitations.Single().Excerpt);
+        Assert.AreEqual(expectedExcerpt, response.Citations.Single().Excerpt);
+        Assert.AreEqual(expectedExcerpt, (await dbContext.ConversationCitations.AsNoTracking().SingleAsync()).Excerpt);
+        Assert.AreEqual(2, await dbContext.ConversationMessages.CountAsync(message => message.ConversationId == response.ConversationId));
+        Assert.AreEqual(1, await dbContext.AuditEvents.CountAsync(audit =>
+            audit.EventType == AuditEventTypes.ConversationCreated && audit.Outcome == "Succeeded"));
+        Assert.AreEqual(1, await dbContext.AuditEvents.CountAsync(audit =>
+            audit.EventType == AuditEventTypes.RagQueryExecuted && audit.Outcome == "Succeeded"));
+    }
+
+    [TestMethod]
     public async Task RagQuery_FailedGeneration_DoesNotPersistPartialConversationTurns()
     {
         using var dbContext = CreateDbContext();
