@@ -11,7 +11,7 @@
 | 10D | Complete/validated | Audit events persisted with expected outcomes/targets | Query API, retention/purge, and governance reporting are out of scope |
 | 11 | Complete/validated | Foundry auth, embedding/vector flow, grounded chat, scoping, and audit | Current deployment identifiers and model evaluation data are not archived |
 | 12 | Implementation complete; functional validation complete; rollout acceptance pending | Successful PDF upload/processing, chunk/embedding persistence, PostgreSQL/pgvector retrieval, vector/full-text/hybrid/semantic retrieval, and the five-PDF corpus are documented | Formal fresh/upgrade migration, transaction/locking/isolation integration evidence and isolated Service Bus recovery/settlement/DLQ/operational evidence remain |
-| 13 | Implementation complete; acceptance pending | Deterministic evaluation harness and PostgreSQL integration tests; seven live pilot cases, abstention repetitions, and two hybrid-enabled responses reported as passed (see below) | Hybrid comparison retrieval paths unverified; prompt-injection and cross-tenant evaluation, quality/performance, retention, and rollout acceptance evidence remain |
+| 13 | Implementation complete; acceptance pending | Deterministic evaluation harness and PostgreSQL integration tests; seven live pilot cases and abstention repetitions reported as passed; hybrid retrieval verified for two hybrid-enabled responses (see below) | Prompt-injection and cross-tenant evaluation, quality/performance, retention, and rollout acceptance evidence remain |
 
 See the [combined Phase 12-13 validation roadmap](phase12-phase13-validation-roadmap.md) for execution environments, validation order, and production-readiness assessment.
 
@@ -58,10 +58,17 @@ These repetition verdicts are user-reported. The conversation IDs above were not
 
 | Case | Requested mode | Actual retrieval mode | Reported response result | Source | Conversation ID |
 | --- | --- | --- | --- | --- | --- |
-| AQ-005 | Hybrid (`Rag__UseHybridSearch=true`) | Unknown | PASS | `hybrid-search-demo.pdf` | `479137a8-afd9-49c1-bbb9-53783f74c419` |
-| AQ-006 | Hybrid (`Rag__UseHybridSearch=true`) | Unknown | PASS | `identity-security.pdf` | `ff7354e4-7861-4c5b-aeb4-842f88d9b637` |
+| AQ-005 | Hybrid (`Rag__UseHybridSearch=true`) | Hybrid | PASS | `hybrid-search-demo.pdf` | `479137a8-afd9-49c1-bbb9-53783f74c419` |
+| AQ-006 | Hybrid (`Rag__UseHybridSearch=true`) | Hybrid | PASS | `identity-security.pdf` | `ff7354e4-7861-4c5b-aeb4-842f88d9b637` |
 
-The responses were reported successful after hybrid was enabled, but no separate runtime evidence established whether either request used hybrid retrieval directly or fell back to vector. The PASS verdicts are user-reported response results, not proof of hybrid retrieval or a scored hybrid-path comparison. Investigate the actual path before scoring the comparisons under the runbook.
+Application Insights traces were correlated with each conversation's `ConversationCreated` audit event and `/api/rag/query` request. Both requests logged `Hybrid search returned 5 results from 10 unique candidates.` and completed successfully; no hybrid fallback warnings were observed in the correlated trace search.
+
+| Case | Correlation ID | Hybrid result log time (UTC) | Full-text results |
+| --- | --- | --- | --- |
+| AQ-005 | `1d4be6c65f41fde9c23710cd5338c269` | 2026-11-23 02:49:01.483 | 2 |
+| AQ-006 | `4407cc16917776a816cefe1b299eb425` | 2026-11-23 02:50:36.740 | 0 |
+
+AQ-006 used the hybrid retrieval path even though full-text returned zero results; its hybrid results came from vector candidates only. The PASS response verdicts remain user-reported; the trace evidence confirms the retrieval path, not semantic citation entailment or a complete quality comparison.
 
 This is pilot evidence, not final rollout approval: Phase 13 implementation is complete, but **Phase 13 acceptance is not complete**.
 
