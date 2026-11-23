@@ -11,13 +11,13 @@
 | 10D | Complete/validated | Audit events persisted with expected outcomes/targets | Query API, retention/purge, and governance reporting are out of scope |
 | 11 | Complete/validated | Foundry auth, embedding/vector flow, grounded chat, scoping, and audit | Current deployment identifiers and model evaluation data are not archived |
 | 12 | Implementation complete; functional validation complete; rollout acceptance pending | Successful PDF upload/processing, chunk/embedding persistence, PostgreSQL/pgvector retrieval, vector/full-text/hybrid/semantic retrieval, and the five-PDF corpus are documented | Formal fresh/upgrade migration, transaction/locking/isolation integration evidence and isolated Service Bus recovery/settlement/DLQ/operational evidence remain |
-| 13 | Implementation complete; acceptance pending | Deterministic evaluation harness and PostgreSQL integration tests; manually executed AQ-001 live pilot reported as passed (see below) | Remaining live pilot cases, prompt-injection and cross-tenant evaluation, quality/performance, retention, and rollout acceptance evidence remain |
+| 13 | Implementation complete; acceptance pending | Deterministic evaluation harness and PostgreSQL integration tests; seven manually executed live pilot cases reported as passed (see below) | Remaining pilot repetitions and hybrid comparisons, prompt-injection and cross-tenant evaluation, quality/performance, retention, and rollout acceptance evidence remain |
 
 See the [combined Phase 12-13 validation roadmap](phase12-phase13-validation-roadmap.md) for execution environments, validation order, and production-readiness assessment.
 
 ## Phase 13 live pilot execution results
 
-The following is a user-reported manual result under the [live evaluation pilot runbook](phase13-live-evaluation-pilot-runbook.md), not a full acceptance decision.
+The following are user-reported manual Swagger results under the [live evaluation pilot runbook](phase13-live-evaluation-pilot-runbook.md), not a full acceptance decision.
 
 | Field | AQ-001 execution evidence |
 | --- | --- |
@@ -32,7 +32,20 @@ The following is a user-reported manual result under the [live evaluation pilot 
 
 Earlier AQ-001 attempts encountered a PostgreSQL citation-length error and are errors, not passes. Their exact attempt count and timestamps are not recorded here. The successful attempt's UTC time, run ID, application commit, model versions, reviewer identity, HTTP status, latency, token usage, and cost were not supplied and remain unknown. The reported citation-support verification is not independent verification of the full bounded model context; retain the approved detailed evidence separately where available.
 
-**Pending:** AQ-003, AQ-004, AQ-005, AQ-006, AB-001, and AB-005. The runbook calls for three independent repetitions of each abstention case and separate hybrid comparisons for AQ-005 and AQ-006; these remain pending. Phase 13 implementation is complete, but **Phase 13 acceptance is not complete**.
+| Case | Question | Result | Source or observed behavior | Conversation ID |
+| --- | --- | --- | --- | --- |
+| AQ-003 | What is HNSW and how should it be used in pgvector retrieval? | PASS | `postgresql-pgvector.pdf` | `019ec6e1-ccec-4700-ad9c-e0ab24a661e5` |
+| AQ-004 | What determines an employee's notice period? | PASS | `employment-policy.pdf` | `be408a49-52a6-4aa7-8d0c-3df00dae3806` |
+| AQ-005 | How does Reciprocal Rank Fusion combine rankings? | PASS | `hybrid-search-demo.pdf` | `0960d879-dc13-4e10-bf6c-64146fa9803a` |
+| AQ-006 | How does tenant filtering prevent one organization from accessing another organization's files? | PASS | `identity-security.pdf` | `b8297d2e-65ee-46ea-bf2a-ed7491d4f691` |
+| AB-001 | What is the exact serial number in the approved corpus? | PASS | Answer: `not found in accessible documents`; citations: `[]` | `da3f85fc-314d-4485-b0f5-5f9d3b4f1e0f` |
+| AB-005 | What was the founder's birthday? | PASS | Answer: `not found in accessible documents`; citations: `[]` | `20ad5604-69ad-475f-8de6-39c8ca2d10aa` |
+
+For these six results, retrieval mode, execution time, reviewer, model settings, and detailed context evidence were not supplied and remain unknown. The AQ-006 question above differs from the runbook's original wording; its result applies to the question actually executed.
+
+**Case-level pilot summary:** AQ-001, AQ-003, AQ-004, AQ-005, AQ-006, AB-001, and AB-005 are reported as PASS. Total executed cases: **7**; passes: **7**; failures: **0**; needs review: **0**. These counts describe the reported case verdicts, not all attempts; the earlier AQ-001 execution errors remain recorded above.
+
+The runbook calls for three independent repetitions of each abstention case and separate hybrid comparisons for AQ-005 and AQ-006. One passing conversation is recorded for each abstention case; the remaining repetitions and hybrid comparisons are not evidenced here. This is pilot evidence, not final rollout approval: Phase 13 implementation is complete, but **Phase 13 acceptance is not complete**.
 
 ## Historical execution blocker
 
