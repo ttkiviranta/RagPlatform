@@ -11,7 +11,7 @@
 | 10D | Complete/validated | Audit events persisted with expected outcomes/targets | Query API, retention/purge, and governance reporting are out of scope |
 | 11 | Complete/validated | Foundry auth, embedding/vector flow, grounded chat, scoping, and audit | Current deployment identifiers and model evaluation data are not archived |
 | 12 | Implementation complete; functional validation complete; rollout acceptance pending | Successful PDF upload/processing, chunk/embedding persistence, PostgreSQL/pgvector retrieval, vector/full-text/hybrid/semantic retrieval, and the five-PDF corpus are documented | Formal fresh/upgrade migration, transaction/locking/isolation integration evidence and isolated Service Bus recovery/settlement/DLQ/operational evidence remain |
-| 13 | Implementation complete; acceptance pending | Deterministic evaluation harness and PostgreSQL integration tests; seven manually executed live pilot cases and three repetitions of each pilot abstention case reported as passed (see below) | Hybrid comparisons, prompt-injection and cross-tenant evaluation, quality/performance, retention, and rollout acceptance evidence remain |
+| 13 | Implementation complete; acceptance pending | Deterministic evaluation harness and PostgreSQL integration tests; seven live pilot cases, abstention repetitions, and two hybrid-enabled responses reported as passed (see below) | Hybrid comparison retrieval paths unverified; prompt-injection and cross-tenant evaluation, quality/performance, retention, and rollout acceptance evidence remain |
 
 See the [combined Phase 12-13 validation roadmap](phase12-phase13-validation-roadmap.md) for execution environments, validation order, and production-readiness assessment.
 
@@ -54,7 +54,16 @@ These repetition verdicts are user-reported. The conversation IDs above were not
 
 **Case-level pilot summary:** AQ-001, AQ-003, AQ-004, AQ-005, AQ-006, AB-001, and AB-005 are reported as PASS. Total executed cases: **7**; passes: **7**; failures: **0**; needs review: **0**. All **6** reported abstention repetitions passed. These counts describe the reported case and repetition verdicts, not all attempts; the earlier AQ-001 execution errors remain recorded above.
 
-The runbook's separate hybrid comparisons for AQ-005 and AQ-006 remain unevidenced. This is pilot evidence, not final rollout approval: Phase 13 implementation is complete, but **Phase 13 acceptance is not complete**.
+### Hybrid-enabled comparison executions
+
+| Case | Requested mode | Actual retrieval mode | Reported response result | Source | Conversation ID |
+| --- | --- | --- | --- | --- | --- |
+| AQ-005 | Hybrid (`Rag__UseHybridSearch=true`) | Unknown | PASS | `hybrid-search-demo.pdf` | `479137a8-afd9-49c1-bbb9-53783f74c419` |
+| AQ-006 | Hybrid (`Rag__UseHybridSearch=true`) | Unknown | PASS | `identity-security.pdf` | `ff7354e4-7861-4c5b-aeb4-842f88d9b637` |
+
+The responses were reported successful after hybrid was enabled, but no separate runtime evidence established whether either request used hybrid retrieval directly or fell back to vector. The PASS verdicts are user-reported response results, not proof of hybrid retrieval or a scored hybrid-path comparison. Investigate the actual path before scoring the comparisons under the runbook.
+
+This is pilot evidence, not final rollout approval: Phase 13 implementation is complete, but **Phase 13 acceptance is not complete**.
 
 ## Historical execution blocker
 
