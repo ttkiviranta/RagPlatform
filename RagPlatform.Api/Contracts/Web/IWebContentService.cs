@@ -4,5 +4,5 @@ namespace RagPlatform.Api.Contracts.Web;
 
 public interface IWebContentService
 {
-    Task<Document> ImportAsync(string url, CancellationToken cancellationToken = default);
+    Task<Document> ImportAsync(string url, CancellationToken cancellationToken = default, IReadOnlyCollection<string?>? tags = null);
 }

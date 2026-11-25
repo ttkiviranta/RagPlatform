@@ -128,7 +128,7 @@ public sealed class DocumentController : ControllerBase
 
         try
         {
-            var document = await _documentService.UploadTextDocumentAsync(request.File, cancellationToken);
+            var document = await _documentService.UploadTextDocumentAsync(request.File, cancellationToken, request.Tags);
             return StatusCode(StatusCodes.Status201Created, document);
         }
         catch (ArgumentException ex)

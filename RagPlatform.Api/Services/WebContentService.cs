@@ -41,8 +41,9 @@ public sealed class WebContentService : IWebContentService
         _logger = logger;
     }
 
-    public async Task<Document> ImportAsync(string url, CancellationToken cancellationToken = default)
+    public async Task<Document> ImportAsync(string url, CancellationToken cancellationToken = default, IReadOnlyCollection<string?>? tags = null)
     {
+        var tagNames = DocumentTagNames.Normalize(tags);
         if (string.IsNullOrWhiteSpace(url))
         {
             throw new ArgumentException("URL is required.", nameof(url));
@@ -138,6 +139,7 @@ public sealed class WebContentService : IWebContentService
             var document = BuildDocument(uri, html);
             document.OwnerUserId = user.Id;
             document.TenantId = user.TenantId;
+            document.Tags = DocumentTagNames.Create(tagNames);
 
             _dbContext.Documents.Add(document);
             _auditEventWriter.Add(user.Id, user.TenantId, AuditEventTypes.DocumentCreated, "Succeeded", "Document", document.Id.ToString());

@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace RagPlatform.Api.Models;
 
@@ -36,6 +37,10 @@ public sealed class Document
 
     [JsonIgnore]
     public ICollection<DocumentTag> Tags { get; set; } = new List<DocumentTag>();
+
+    [NotMapped]
+    [JsonPropertyName("tags")]
+    public IReadOnlyList<string> TagNames => Tags.Select(tag => tag.Name).OrderBy(name => name, StringComparer.Ordinal).ToArray();
 
     [JsonIgnore]
     public DocumentMetadata? Metadata { get; set; }

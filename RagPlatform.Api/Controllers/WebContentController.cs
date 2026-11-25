@@ -38,12 +38,12 @@ public sealed class WebContentController : ControllerBase
 
         try
         {
-            var document = await _webContentService.ImportAsync(request.Url, cancellationToken);
+            var document = await _webContentService.ImportAsync(request.Url, cancellationToken, request.Tags);
             return StatusCode(StatusCodes.Status201Created, document);
         }
         catch (ArgumentException ex)
         {
-            ModelState.AddModelError(nameof(WebContentImportRequest.Url), ex.Message);
+            ModelState.AddModelError(ex.ParamName == "tags" ? "tags" : nameof(WebContentImportRequest.Url), ex.Message);
             return ValidationProblem(ModelState);
         }
         catch (InvalidOperationException ex)

@@ -40,13 +40,20 @@ public sealed class DocumentService : IDocumentService
         var user = await _documentAccessService.GetRequiredCurrentUserAsync(cancellationToken);
         return await _documentAccessService.ScopeDocuments(_dbContext.Documents, user)
             .AsNoTracking()
+            .Include(document => document.Tags)
             .OrderByDescending(document => document.CreatedAt)
             .ToListAsync(cancellationToken);
     }
 
     public async Task<Document?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _documentAccessService.GetAccessibleDocumentAsync(id, DocumentPermission.Read, cancellationToken);
+        var document = await _documentAccessService.GetAccessibleDocumentAsync(id, DocumentPermission.Read, cancellationToken);
+        if (document is not null)
+        {
+            await _dbContext.Entry(document).Collection(item => item.Tags).LoadAsync(cancellationToken);
+        }
+
+        return document;
     }
 
     public async Task<Document> CreateAsync(DocumentCreateRequest request, CancellationToken cancellationToken = default)
@@ -55,12 +62,14 @@ public sealed class DocumentService : IDocumentService
 
         var title = NormalizeRequiredValue(request.Title, nameof(request.Title));
         var content = NormalizeRequiredValue(request.Content, nameof(request.Content));
+        var tagNames = DocumentTagNames.Normalize(request.Tags);
         var user = await _documentAccessService.GetRequiredCurrentUserAsync(cancellationToken);
 
         var document = new Document
         {
             Title = title,
             Content = content,
+            Tags = DocumentTagNames.Create(tagNames),
             OwnerUserId = user.Id,
             TenantId = user.TenantId,
             CreatedAt = DateTime.UtcNow
@@ -81,6 +90,7 @@ public sealed class DocumentService : IDocumentService
 
         var title = NormalizeRequiredValue(request.Title, nameof(request.Title));
         var content = NormalizeRequiredValue(request.Content, nameof(request.Content));
+        var tagNames = request.Tags is null ? null : DocumentTagNames.Normalize(request.Tags);
 
         var existingDocument = await _documentAccessService.GetAccessibleDocumentAsync(
             id,
@@ -91,6 +101,25 @@ public sealed class DocumentService : IDocumentService
         {
             _logger.LogWarning("Update requested for missing document {DocumentId}", id);
             return null;
+        }
+
+        await _dbContext.Entry(existingDocument).Collection(document => document.Tags).LoadAsync(cancellationToken);
+        if (tagNames is not null)
+        {
+            var requestedNames = tagNames.ToHashSet(StringComparer.Ordinal);
+            foreach (var tag in existingDocument.Tags.Where(tag => !requestedNames.Contains(tag.Name)).ToList())
+            {
+                existingDocument.Tags.Remove(tag);
+                _dbContext.DocumentTags.Remove(tag);
+            }
+
+            var existingNames = existingDocument.Tags.Select(tag => tag.Name).ToHashSet(StringComparer.Ordinal);
+            foreach (var name in tagNames.Where(name => !existingNames.Contains(name)))
+            {
+                var tag = new DocumentTag { Name = name, DocumentId = existingDocument.Id };
+                existingDocument.Tags.Add(tag);
+                _dbContext.DocumentTags.Add(tag);
+            }
         }
 
         existingDocument.Title = title;
@@ -128,9 +157,10 @@ public sealed class DocumentService : IDocumentService
         return true;
     }
 
-    public async Task<Document> UploadTextDocumentAsync(IFormFile file, CancellationToken cancellationToken = default)
+    public async Task<Document> UploadTextDocumentAsync(IFormFile file, CancellationToken cancellationToken = default, IReadOnlyCollection<string?>? tags = null)
     {
         ArgumentNullException.ThrowIfNull(file);
+        var tagNames = DocumentTagNames.Normalize(tags);
         var user = await _documentAccessService.GetRequiredCurrentUserAsync(cancellationToken);
 
         if (file.Length == 0)
@@ -172,6 +202,7 @@ public sealed class DocumentService : IDocumentService
             FileSize = file.Length,
             OwnerUserId = user.Id,
             TenantId = user.TenantId,
+            Tags = DocumentTagNames.Create(tagNames),
             CreatedAt = DateTime.UtcNow
         };
 

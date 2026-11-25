@@ -156,6 +156,8 @@ public sealed class SearchEndpointTests
         var paths = swagger.GetProperty("paths");
         Assert.IsTrue(paths.GetProperty("/api/search/fulltext").TryGetProperty("post", out _));
         Assert.IsTrue(paths.GetProperty("/api/search/hybrid").TryGetProperty("post", out _));
+        Assert.IsTrue(paths.GetProperty("/api/documents/upload").TryGetProperty("post", out _));
+        Assert.IsTrue(paths.GetProperty("/api/documents/upload/pdf").TryGetProperty("post", out _));
     }
 
     private static WebApplicationFactory<Program> CreateFactory(

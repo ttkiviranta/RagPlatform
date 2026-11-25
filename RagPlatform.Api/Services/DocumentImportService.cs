@@ -45,9 +45,10 @@ public sealed class DocumentImportService
         _logger = logger;
     }
 
-    public async Task<Document> UploadPdfAsync(IFormFile file, CancellationToken cancellationToken = default)
+    public async Task<Document> UploadPdfAsync(IFormFile file, CancellationToken cancellationToken = default, IReadOnlyCollection<string?>? tags = null)
     {
         ArgumentNullException.ThrowIfNull(file);
+        var tagNames = DocumentTagNames.Normalize(tags);
         var validationStopwatch = Stopwatch.StartNew();
         (string FileName, string Title) fileDetails;
         try
@@ -86,7 +87,8 @@ public sealed class DocumentImportService
             UpdatedAt = now,
             ImportStatus = DocumentImportStatus.Queued,
             OwnerUserId = user.Id,
-            TenantId = user.TenantId
+            TenantId = user.TenantId,
+            Tags = DocumentTagNames.Create(tagNames)
         };
 
         var stagingBlobKey = $"{document.Id:N}/{Guid.NewGuid():N}.pdf";

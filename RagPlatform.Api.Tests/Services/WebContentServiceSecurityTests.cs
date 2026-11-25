@@ -81,13 +81,29 @@ public sealed class WebContentServiceSecurityTests : PostgreSqlTestClassBase
         {
             var sourceUrl = "https://example.com/article";
 
-            var document = await fixture.Service.ImportAsync(sourceUrl);
+            var document = await fixture.Service.ImportAsync(sourceUrl, tags: [" web ", "reference"]);
 
             Assert.AreEqual(sourceUrl, document.SourceUrl);
             Assert.AreEqual("Example", document.Title);
             Assert.AreEqual("Readable content.", document.Content);
             Assert.AreEqual(1, await fixture.DbContext.Documents.CountAsync());
+            fixture.DbContext.ChangeTracker.Clear();
+            var names = await fixture.DbContext.DocumentTags.Where(tag => tag.DocumentId == document.Id)
+                .Select(tag => tag.Name).OrderBy(name => name).ToArrayAsync();
+            CollectionAssert.AreEqual(new[] { "reference", "web" }, names);
         }
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task ImportAsync_InvalidTags_AreRejectedBeforeSendingRequest()
+    {
+        using var fixture = CreateFixture(_ => Task.FromResult(CreateHtmlResponse("text/html")), seedUser: false);
+        var exception = await Assert.ThrowsExactlyAsync<ArgumentException>(
+            () => fixture.Service.ImportAsync("https://example.com/", tags: ["duplicate", " duplicate "]));
+
+        Assert.AreEqual("tags", exception.ParamName);
+        Assert.AreEqual(0, fixture.Handler.RequestedUris.Count);
     }
 
     [TestMethod]

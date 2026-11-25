@@ -14,5 +14,5 @@ public interface IDocumentService
 
     Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
 
-    Task<Document> UploadTextDocumentAsync(IFormFile file, CancellationToken cancellationToken = default);
+    Task<Document> UploadTextDocumentAsync(IFormFile file, CancellationToken cancellationToken = default, IReadOnlyCollection<string?>? tags = null);
 }

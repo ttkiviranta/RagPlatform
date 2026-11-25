@@ -47,7 +47,7 @@ public sealed class DocumentImportController : ControllerBase
 
         try
         {
-            var document = await _documentImportService.UploadPdfAsync(request.File, cancellationToken);
+            var document = await _documentImportService.UploadPdfAsync(request.File, cancellationToken, request.Tags);
             var response = new DocumentImportResponse(
                 document.Id,
                 document.ImportStatus!.Value.ToString());
@@ -56,7 +56,7 @@ public sealed class DocumentImportController : ControllerBase
         }
         catch (ArgumentException exception)
         {
-            ModelState.AddModelError(nameof(PdfDocumentUploadRequest.File), exception.Message);
+            ModelState.AddModelError(exception.ParamName == "tags" ? "tags" : nameof(PdfDocumentUploadRequest.File), exception.Message);
             return ValidationProblem(ModelState);
         }
         catch (DocumentImportPublishException exception)

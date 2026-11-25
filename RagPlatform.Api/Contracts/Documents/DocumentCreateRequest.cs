@@ -10,4 +10,6 @@ public sealed class DocumentCreateRequest
 
     [Required]
     public string Content { get; set; } = string.Empty;
+
+    public List<string?>? Tags { get; set; }
 }

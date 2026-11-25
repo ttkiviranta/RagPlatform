@@ -7,4 +7,6 @@ public sealed class WebContentImportRequest
     [Required]
     [Url]
     public string Url { get; set; } = string.Empty;
+
+    public List<string?>? Tags { get; set; }
 }
