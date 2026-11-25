@@ -7,4 +7,6 @@ public sealed class RagOptions
     public bool UseHybridSearch { get; set; } = false;
 
     public bool UseReranking { get; set; } = false;
+
+    public bool AllowModelKnowledgeFallback { get; set; } = false;
 }

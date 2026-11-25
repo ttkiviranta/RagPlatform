@@ -217,6 +217,28 @@ public sealed class RagServiceRetrievalTests
         Assert.AreEqual(1, vector.CallCount);
     }
 
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task QueryAsync_NoContext_ModelKnowledgeOptionDoesNotChangeCurrentBehavior(bool enabled)
+    {
+        var chat = new RagQualityHardeningTests.CapturingChatCompletionService();
+        var answer = new FoundryAnswerGenerationService(
+            new PromptBuilder(), chat, new NoOpTelemetryService(),
+            Microsoft.Extensions.Options.Options.Create(new FoundryOptions()),
+            NullLogger<FoundryAnswerGenerationService>.Instance);
+        var service = CreateService(new FakeVectorSearchService(), new FakeHybridSearchService([]),
+            new CapturingCitationService(), useHybridSearch: false,
+            allowModelKnowledgeFallback: enabled, answer: answer);
+
+        var response = await service.QueryAsync("What is the capital of Finland?");
+
+        Assert.AreEqual(PromptBuilder.InsufficientEvidenceResponse, response.Answer);
+        Assert.AreEqual(0, response.Citations.Count);
+        Assert.IsNull(response.AnswerSource);
+        Assert.AreEqual(0, chat.CallCount);
+    }
+
     [TestMethod]
     public async Task QueryAsync_RerankerCancellation_DoesNotFallBack()
     {
@@ -236,18 +258,20 @@ public sealed class RagServiceRetrievalTests
         CapturingCitationService citation,
         bool useHybridSearch,
         bool useReranking = false,
-        IRerankingService? reranker = null)
+        IRerankingService? reranker = null,
+        bool allowModelKnowledgeFallback = false,
+        IAnswerGenerationService? answer = null)
     {
         return new RagService(
             vector,
             hybrid,
             reranker ?? new NoOpRerankingService(),
-            Microsoft.Extensions.Options.Options.Create(new RagOptions { UseHybridSearch = useHybridSearch, UseReranking = useReranking }),
+            Microsoft.Extensions.Options.Options.Create(new RagOptions { UseHybridSearch = useHybridSearch, UseReranking = useReranking, AllowModelKnowledgeFallback = allowModelKnowledgeFallback }),
             citation,
             new NoOpTelemetryService(),
             new FakeCurrentUserService(),
             new FakeAuditEventWriter(),
-            new FakeAnswerGenerationService(),
+            answer ?? new FakeAnswerGenerationService(),
             new FakeConversationMessageService(),
             NullLogger<RagService>.Instance);
     }

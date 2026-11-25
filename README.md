@@ -271,6 +271,8 @@ Optional hybrid RAG reranking is controlled by `Rag:UseReranking`, which default
 
 An opt-in [reranking evaluation](docs/validation/reranking-evaluation.md) compares retrieval ordering, relevance, latency and available token usage against the hybrid baseline. It requires an isolated live environment and does not assume reranking improves results.
 
+`Rag:AllowModelKnowledgeFallback` defaults to `false` and currently reserves configuration for a future fallback; **setting it to `true` does not enable model-knowledge answers yet**. The response contract reserves an optional `answerSource` value of `ModelKnowledge` for that future path; it is omitted from current responses. Clients can display this value as "Model knowledge (no supporting documents found)". The intended fallback will run only when no usable authorized document context is available and return no document citations. Existing grounded and abstention behavior is unchanged. The current retrieval pipeline does not establish semantic relevance, so nonempty context is not proof that a document supports the answer; model-knowledge answers can also be incorrect or stale.
+
 ## Roadmap
 
 ### Completed
