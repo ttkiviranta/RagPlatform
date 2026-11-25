@@ -14,6 +14,7 @@ public sealed class FoundryAnswerGenerationService : IAnswerGenerationService
     private const int MaxContextCharacters = 4000;
     private const int MaxConversationHistoryCharacters = 2000;
     private const int MaxConversationHistoryMessages = 6;
+    private const string ModelKnowledgeSystemPrompt = "Answer the user's question using general model knowledge. No documents or external sources were provided. Do not invent or include citations, source names, or URLs. If uncertain, say so. Return only the answer.";
     private static readonly Regex CitationLabelPattern = new(@"\[((?=[^\]]*\d)[^\]]*)\]", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private readonly IPromptBuilder _promptBuilder;
     private readonly IFoundryChatCompletionService _chatCompletionService;
@@ -42,7 +43,8 @@ public sealed class FoundryAnswerGenerationService : IAnswerGenerationService
         int retrievedChunkCount,
         IReadOnlyList<RagCitationDto> citations,
         IReadOnlyList<ConversationMessageResponse> conversationHistory,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool allowModelKnowledgeFallback = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(question);
         ArgumentOutOfRangeException.ThrowIfNegative(retrievedChunkCount);
@@ -53,6 +55,11 @@ public sealed class FoundryAnswerGenerationService : IAnswerGenerationService
         var (context, includedCitationNumbers) = BuildContext(citations);
         if (string.IsNullOrWhiteSpace(context))
         {
+            if (allowModelKnowledgeFallback)
+            {
+                return await GenerateModelKnowledgeAsync(question, retrievedChunkCount, stopwatch, cancellationToken);
+            }
+
             _telemetryService.TrackAnswerGeneration(
                 "Azure AI Foundry",
                 _deployment,
@@ -167,6 +174,37 @@ public sealed class FoundryAnswerGenerationService : IAnswerGenerationService
             citationNumbers,
             context.Length,
             prompt.Length);
+    }
+
+    private async Task<GroundedAnswerResult> GenerateModelKnowledgeAsync(
+        string question, int retrievedChunkCount, Stopwatch stopwatch, CancellationToken cancellationToken)
+    {
+        var messages = new[] { new RagChatMessage { Role = "User", Content = question } };
+        FoundryChatCompletionResponse? completion = null;
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            completion = await _chatCompletionService.CompleteAsync(ModelKnowledgeSystemPrompt, messages, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            var answer = completion.Answer?.Trim();
+            if (string.IsNullOrWhiteSpace(answer) || CitationLabelPattern.IsMatch(answer))
+            {
+                throw new InvalidOperationException("Model-knowledge output was empty or contained a citation label.");
+            }
+
+            _telemetryService.TrackAnswerGeneration("Azure AI Foundry", _deployment, retrievedChunkCount, 0,
+                stopwatch.Elapsed.TotalMilliseconds, completion.InputTokenCount, completion.OutputTokenCount, true, "ModelKnowledge");
+            _logger.LogInformation("Model-knowledge answer generated without document citations for deployment {Deployment}.", _deployment);
+            return new GroundedAnswerResult(answer, Array.Empty<int>(), 0, question.Length, RagAnswerSource.ModelKnowledge);
+        }
+        catch (Exception exception)
+        {
+            _telemetryService.TrackAnswerGeneration("Azure AI Foundry", _deployment, retrievedChunkCount, 0,
+                stopwatch.Elapsed.TotalMilliseconds, completion?.InputTokenCount, completion?.OutputTokenCount, false,
+                "ModelKnowledgeFailed", exception.GetType().Name);
+            _logger.LogError(exception, "Model-knowledge answer generation failed for deployment {Deployment}.", _deployment);
+            throw;
+        }
     }
 
     private static string BuildBoundedConversationHistory(

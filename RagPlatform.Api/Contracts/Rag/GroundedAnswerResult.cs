@@ -4,4 +4,5 @@ public sealed record GroundedAnswerResult(
     string Answer,
     IReadOnlyList<int> CitationNumbers,
     int ContextCharacterCount,
-    int PromptCharacterCount);
+    int PromptCharacterCount,
+    string? AnswerSource = null);

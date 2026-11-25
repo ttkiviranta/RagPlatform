@@ -42,7 +42,7 @@ The API returns ranked chunk results from vector search. The RAG answer flow def
 
 `IAnswerGenerationService` separates answer generation from the RAG orchestration. `FoundryAnswerGenerationService` builds a bounded context (up to 4,000 characters) from the authorized retrieved evidence and delegates chat completion through the Foundry abstraction. The deployment name, output-token limit, timeout, and temperature are configurable.
 
-The deterministic system prompt limits factual answers to supplied context, treats retrieved material and prior user messages as untrusted data rather than instructions, prohibits unsupported facts, and requires the explicit `not found in accessible documents` response when evidence is insufficient. Empty usable context returns that fallback without calling Foundry. Returned answer labels are checked against the labels supplied in the bounded prompt before a successful response is built.
+The grounded system prompt limits factual answers to supplied context, treats retrieved material and prior user messages as untrusted data rather than instructions, prohibits unsupported facts, and requires the explicit `not found in accessible documents` response when evidence is insufficient. With model-knowledge fallback disabled (the default), empty usable context returns that response without calling Foundry. A later optional `Rag:AllowModelKnowledgeFallback` setting can instead generate a labeled, uncited model-knowledge answer after successful retrieval with no usable context; see the [README](../../../README.md#api-surface). Grounded answer labels are checked against the labels supplied in the bounded prompt before a successful response is built.
 
 ## Citation validation model
 

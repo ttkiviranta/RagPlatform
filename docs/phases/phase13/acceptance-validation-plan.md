@@ -47,7 +47,7 @@ Run against an isolated, named deployment using the exact configuration intended
 
 - Verify valid deployment, output-token limit, temperature, and timeout settings reach the chat-completion boundary as configured. Verify invalid/missing required settings fail explicitly.
 - Test a supported question with known retrieved evidence and confirm a non-empty answer, valid supplied citation labels, and available token-usage reporting.
-- Test empty retrieval: the API returns the explicit `not found in accessible documents` response and does not make a chat completion request.
+- With `Rag:AllowModelKnowledgeFallback=false`, test empty retrieval: the API returns the explicit `not found in accessible documents` response and does not make a chat completion request.
 - Test non-empty but insufficient evidence: the model abstains using the documented exact fallback, and the result is classified distinctly from a generation error.
 - Simulate timeout, throttling, authentication/configuration failure, and service errors using an isolated endpoint or deterministic transport fake. Verify failure telemetry and that no success-shaped answer/citations or conversation turn are persisted.
 - Verify cancellation and timeout behavior terminates the request within the agreed operational bound.

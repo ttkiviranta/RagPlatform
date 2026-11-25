@@ -220,24 +220,153 @@ public sealed class RagServiceRetrievalTests
     [DataTestMethod]
     [DataRow(false)]
     [DataRow(true)]
-    public async Task QueryAsync_NoContext_ModelKnowledgeOptionDoesNotChangeCurrentBehavior(bool enabled)
+    public async Task QueryAsync_NoContext_UsesConfiguredModelKnowledge(bool enabled)
     {
-        var chat = new RagQualityHardeningTests.CapturingChatCompletionService();
-        var answer = new FoundryAnswerGenerationService(
-            new PromptBuilder(), chat, new NoOpTelemetryService(),
-            Microsoft.Extensions.Options.Options.Create(new FoundryOptions()),
-            NullLogger<FoundryAnswerGenerationService>.Instance);
+        var chat = new RagQualityHardeningTests.CapturingChatCompletionService
+        {
+            Response = new FoundryChatCompletionResponse { Answer = "Helsinki." }
+        };
+        var answer = CreateAnswerService(chat);
+        var conversation = new FakeConversationMessageService();
         var service = CreateService(new FakeVectorSearchService(), new FakeHybridSearchService([]),
             new CapturingCitationService(), useHybridSearch: false,
-            allowModelKnowledgeFallback: enabled, answer: answer);
+            allowModelKnowledgeFallback: enabled, answer: answer, conversation: conversation);
 
-        var response = await service.QueryAsync("What is the capital of Finland?");
+        var response = await service.QueryAsync("What is the capital of Finland?", tags: ["general"]);
+
+        Assert.AreEqual(enabled ? "Helsinki." : PromptBuilder.InsufficientEvidenceResponse, response.Answer);
+        Assert.AreEqual(0, response.Citations.Count);
+        Assert.AreEqual(enabled ? RagAnswerSource.ModelKnowledge : null, response.AnswerSource);
+        Assert.AreEqual(enabled ? 1 : 0, chat.CallCount);
+        Assert.AreEqual(enabled ? "Model knowledge (no supporting documents found):\nHelsinki." : PromptBuilder.InsufficientEvidenceResponse, conversation.AssistantContent);
+        Assert.AreEqual(0, conversation.Citations!.Count);
+    }
+
+    [TestMethod]
+    public async Task QueryAsync_HybridFailureThenEmptyVector_DoesNotInvokeModelKnowledge()
+    {
+        var chat = new RagQualityHardeningTests.CapturingChatCompletionService();
+        var vector = new FakeVectorSearchService();
+        var hybrid = new FakeHybridSearchService([]) { Error = new InvalidOperationException("failed") };
+        var service = CreateService(vector, hybrid, new CapturingCitationService(), true,
+            allowModelKnowledgeFallback: true, answer: CreateAnswerService(chat));
+
+        var response = await service.QueryAsync("question", tags: ["tag"]);
 
         Assert.AreEqual(PromptBuilder.InsufficientEvidenceResponse, response.Answer);
-        Assert.AreEqual(0, response.Citations.Count);
+        Assert.IsNull(response.AnswerSource);
+        Assert.AreEqual(0, chat.CallCount);
+        CollectionAssert.AreEqual(new[] { "tag" }, vector.LastTags!.ToArray());
+    }
+
+    [TestMethod]
+    public async Task QueryAsync_HybridAndVectorEmpty_InvokesModelKnowledge()
+    {
+        var chat = new RagQualityHardeningTests.CapturingChatCompletionService { Response = new FoundryChatCompletionResponse { Answer = "answer" } };
+        var vector = new FakeVectorSearchService();
+        var hybrid = new FakeHybridSearchService([]);
+        var service = CreateService(vector, hybrid, new CapturingCitationService(), true,
+            allowModelKnowledgeFallback: true, answer: CreateAnswerService(chat));
+
+        var response = await service.QueryAsync("question");
+
+        Assert.AreEqual(RagAnswerSource.ModelKnowledge, response.AnswerSource);
+        Assert.AreEqual(1, hybrid.CallCount);
+        Assert.AreEqual(1, vector.CallCount);
+        Assert.AreEqual(1, chat.CallCount);
+    }
+
+    [TestMethod]
+    public async Task QueryAsync_ExpandedSearchFailsAndNoUsableCitations_DoesNotInvokeModelKnowledge()
+    {
+        var chat = new RagQualityHardeningTests.CapturingChatCompletionService();
+        var hybrid = new FakeHybridSearchService([CreateHybridResult()]) { ExpandedError = new InvalidOperationException("failed") };
+        var service = CreateService(new FakeVectorSearchService(), hybrid, new CapturingCitationService(), true, true,
+            allowModelKnowledgeFallback: true, answer: CreateAnswerService(chat));
+
+        var response = await service.QueryAsync("question");
+
+        Assert.AreEqual(PromptBuilder.InsufficientEvidenceResponse, response.Answer);
         Assert.IsNull(response.AnswerSource);
         Assert.AreEqual(0, chat.CallCount);
     }
+
+    [TestMethod]
+    public async Task QueryAsync_InactiveUser_DoesNotRetrieveOrInvokeModelKnowledge()
+    {
+        var chat = new RagQualityHardeningTests.CapturingChatCompletionService();
+        var vector = new FakeVectorSearchService();
+        var service = CreateService(vector, new FakeHybridSearchService([]), new CapturingCitationService(), false,
+            allowModelKnowledgeFallback: true, answer: CreateAnswerService(chat), currentUser: new FakeCurrentUserService { Active = false });
+
+        await Assert.ThrowsExactlyAsync<UnauthorizedAccessException>(() => service.QueryAsync("question"));
+        Assert.AreEqual(0, vector.CallCount);
+        Assert.AreEqual(0, chat.CallCount);
+    }
+
+    [TestMethod]
+    public async Task QueryAsync_UnavailableConversation_DoesNotRetrieveOrInvokeModelKnowledge()
+    {
+        var chat = new RagQualityHardeningTests.CapturingChatCompletionService();
+        var vector = new FakeVectorSearchService();
+        var service = CreateService(vector, new FakeHybridSearchService([]), new CapturingCitationService(), false,
+            allowModelKnowledgeFallback: true, answer: CreateAnswerService(chat));
+
+        await Assert.ThrowsExactlyAsync<KeyNotFoundException>(() => service.QueryAsync("question", conversationId: Guid.NewGuid()));
+        Assert.AreEqual(0, vector.CallCount);
+        Assert.AreEqual(0, chat.CallCount);
+    }
+
+    [TestMethod]
+    public async Task QueryAsync_VectorFailure_DoesNotInvokeModelKnowledgeOrPersist()
+    {
+        var chat = new RagQualityHardeningTests.CapturingChatCompletionService();
+        var conversation = new FakeConversationMessageService();
+        var vector = new FakeVectorSearchService { Error = new InvalidOperationException("failed") };
+        var service = CreateService(vector, new FakeHybridSearchService([]), new CapturingCitationService(), false,
+            allowModelKnowledgeFallback: true, answer: CreateAnswerService(chat), conversation: conversation);
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => service.QueryAsync("question"));
+        Assert.AreEqual(0, chat.CallCount);
+        Assert.IsNull(conversation.AssistantContent);
+    }
+
+    [TestMethod]
+    public async Task QueryAsync_ModelKnowledgeFailure_DoesNotPersist()
+    {
+        var chat = new RagQualityHardeningTests.CapturingChatCompletionService { Error = new TimeoutException("failed") };
+        var conversation = new FakeConversationMessageService();
+        var service = CreateService(new FakeVectorSearchService(), new FakeHybridSearchService([]), new CapturingCitationService(), false,
+            allowModelKnowledgeFallback: true, answer: CreateAnswerService(chat), conversation: conversation);
+
+        await Assert.ThrowsExactlyAsync<TimeoutException>(() => service.QueryAsync("question"));
+        Assert.IsNull(conversation.AssistantContent);
+    }
+
+    [TestMethod]
+    public async Task QueryAsync_GroundedEvidence_PreservesCitationsWhenFallbackEnabled()
+    {
+        var chat = new RagQualityHardeningTests.CapturingChatCompletionService
+        {
+            Response = new FoundryChatCompletionResponse { Answer = "Supported answer [1]." }
+        };
+        var citation = new CapturingCitationService { Citations = [new RagCitationDto { CitationNumber = 1, Excerpt = "Evidence" }] };
+        var conversation = new FakeConversationMessageService();
+        var service = CreateService(new FakeVectorSearchService(CreateVectorResult()), new FakeHybridSearchService([]), citation, false,
+            allowModelKnowledgeFallback: true, answer: CreateAnswerService(chat), conversation: conversation);
+
+        var response = await service.QueryAsync("question");
+
+        Assert.AreEqual("Supported answer [1].", response.Answer);
+        Assert.IsNull(response.AnswerSource);
+        Assert.AreEqual(1, response.Citations.Count);
+        Assert.AreEqual("Supported answer [1].", conversation.AssistantContent);
+        Assert.AreEqual(1, conversation.Citations!.Count);
+    }
+
+    private static FoundryAnswerGenerationService CreateAnswerService(IFoundryChatCompletionService chat) =>
+        new(new PromptBuilder(), chat, new NoOpTelemetryService(),
+            Microsoft.Extensions.Options.Options.Create(new FoundryOptions()), NullLogger<FoundryAnswerGenerationService>.Instance);
 
     [TestMethod]
     public async Task QueryAsync_RerankerCancellation_DoesNotFallBack()
@@ -260,7 +389,9 @@ public sealed class RagServiceRetrievalTests
         bool useReranking = false,
         IRerankingService? reranker = null,
         bool allowModelKnowledgeFallback = false,
-        IAnswerGenerationService? answer = null)
+        IAnswerGenerationService? answer = null,
+        FakeConversationMessageService? conversation = null,
+        FakeCurrentUserService? currentUser = null)
     {
         return new RagService(
             vector,
@@ -269,10 +400,10 @@ public sealed class RagServiceRetrievalTests
             Microsoft.Extensions.Options.Options.Create(new RagOptions { UseHybridSearch = useHybridSearch, UseReranking = useReranking, AllowModelKnowledgeFallback = allowModelKnowledgeFallback }),
             citation,
             new NoOpTelemetryService(),
-            new FakeCurrentUserService(),
+            currentUser ?? new FakeCurrentUserService(),
             new FakeAuditEventWriter(),
             answer ?? new FakeAnswerGenerationService(),
-            new FakeConversationMessageService(),
+            conversation ?? new FakeConversationMessageService(),
             NullLogger<RagService>.Instance);
     }
 
@@ -302,6 +433,7 @@ public sealed class RagServiceRetrievalTests
     {
         public int CallCount { get; private set; }
         public IReadOnlyCollection<string?>? LastTags { get; private set; }
+        public Exception? Error { get; init; }
 
         public Task<VectorSearchResponse> SearchAsync(
             string query,
@@ -312,6 +444,7 @@ public sealed class RagServiceRetrievalTests
         {
             CallCount++;
             LastTags = tags;
+            if (Error is not null) return Task.FromException<VectorSearchResponse>(Error);
             return Task.FromResult(new VectorSearchResponse { Results = results, RequestedTopK = topK });
         }
     }
@@ -385,18 +518,20 @@ public sealed class RagServiceRetrievalTests
     private sealed class CapturingCitationService : IRagCitationService
     {
         public IReadOnlyList<VectorSearchResult> ReceivedResults { get; private set; } = Array.Empty<VectorSearchResult>();
+        public IReadOnlyList<RagCitationDto> Citations { get; init; } = Array.Empty<RagCitationDto>();
 
         public Task<IReadOnlyList<RagCitationDto>> CreateCitationsAsync(
             IReadOnlyList<VectorSearchResult> retrievedChunks,
             CancellationToken cancellationToken = default)
         {
             ReceivedResults = retrievedChunks;
-            return Task.FromResult<IReadOnlyList<RagCitationDto>>(Array.Empty<RagCitationDto>());
+            return Task.FromResult(Citations);
         }
     }
 
     private sealed class FakeCurrentUserService : ICurrentUserService
     {
+        public bool Active { get; init; } = true;
         public bool IsAuthenticated => true;
         public ClaimsPrincipal? Principal => new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, "test")], "test"));
         public string? EntraObjectId => "test-object-id";
@@ -405,7 +540,7 @@ public sealed class RagServiceRetrievalTests
 
         public Task<User?> GetCurrentUserAsync(CancellationToken cancellationToken = default)
         {
-            return Task.FromResult<User?>(new User { Id = Guid.NewGuid(), TenantId = "test-tenant", IsActive = true });
+            return Task.FromResult<User?>(new User { Id = Guid.NewGuid(), TenantId = "test-tenant", IsActive = Active });
         }
     }
 
@@ -425,7 +560,8 @@ public sealed class RagServiceRetrievalTests
             int retrievedChunkCount,
             IReadOnlyList<RagCitationDto> citations,
             IReadOnlyList<ConversationMessageResponse> conversationHistory,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            bool allowModelKnowledgeFallback = false)
         {
             return Task.FromResult(new GroundedAnswerResult("answer", Array.Empty<int>(), 0, 0));
         }
@@ -433,6 +569,9 @@ public sealed class RagServiceRetrievalTests
 
     private sealed class FakeConversationMessageService : IConversationMessageService
     {
+        public string? AssistantContent { get; private set; }
+        public IReadOnlyList<RagCitationDto>? Citations { get; private set; }
+
         public Task<IReadOnlyCollection<ConversationMessageResponse>?> GetMessagesAsync(Guid conversationId, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyCollection<ConversationMessageResponse>?>(null);
 
         public Task<ConversationMessageResponse?> CreateUserMessageAsync(Guid conversationId, CreateConversationMessageRequest request, CancellationToken cancellationToken = default) => Task.FromResult<ConversationMessageResponse?>(null);
@@ -441,6 +580,11 @@ public sealed class RagServiceRetrievalTests
 
         public Task<bool> AppendExchangeAsync(Guid conversationId, string userContent, string assistantContent, CancellationToken cancellationToken = default) => Task.FromResult(true);
 
-        public Task<Guid?> AppendRagExchangeAsync(Guid? conversationId, string userContent, string assistantContent, IReadOnlyList<RagCitationDto> citations, CancellationToken cancellationToken = default) => Task.FromResult<Guid?>(Guid.NewGuid());
+        public Task<Guid?> AppendRagExchangeAsync(Guid? conversationId, string userContent, string assistantContent, IReadOnlyList<RagCitationDto> citations, CancellationToken cancellationToken = default)
+        {
+            AssistantContent = assistantContent;
+            Citations = citations;
+            return Task.FromResult<Guid?>(Guid.NewGuid());
+        }
     }
 }

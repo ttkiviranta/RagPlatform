@@ -38,6 +38,7 @@ Configuration can be supplied by environment variables or another approved .NET 
 | `Foundry__ChatTemperature` | Record the effective value; default `0.2`, allowed range `0`-`2`, subject to model support. |
 | `Rag__UseHybridSearch` | Set `false` for the baseline; set `true` only for the comparison run. |
 | `Rag__UseReranking` | Set `false` for both runs to compare vector and hybrid RRF without reranking. |
+| `Rag__AllowModelKnowledgeFallback` | Set `false` for both runs to preserve grounded abstention. |
 | `ServiceBus__DocumentImportWorkerEnabled` | Set `false` for this pilot. |
 | `AzureAd__Authority` and `AzureAd__Audience` | Supply approved test values when the checked-in/default configuration is not the selected test application. Confirm issuer, audience and active application user. `AzureAd__TenantId` and `AzureAd__ClientId` are also used as configuration fallbacks where applicable. |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | Optional, when an approved isolated Application Insights resource is used and `ApplicationInsights__ConnectionString` is not set. Protect the value and verify retention/privacy settings. |

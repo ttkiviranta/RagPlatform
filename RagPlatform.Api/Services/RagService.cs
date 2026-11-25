@@ -92,27 +92,31 @@ public sealed class RagService : IRagService
                     ?? throw new KeyNotFoundException("Conversation was not found.");
             }
 
-            var retrievedChunks = await RetrieveAsync(query, topK, cancellationToken, tagNames);
-            retrievedChunkCount = retrievedChunks.Count;
+            var retrieval = await RetrieveAsync(query, topK, cancellationToken, tagNames);
+            retrievedChunkCount = retrieval.Results.Count;
             var availableCitations = await _citationService.CreateCitationsAsync(
-                retrievedChunks,
+                retrieval.Results,
                 cancellationToken);
             var answerResult = await _answerGenerationService.GenerateAnswerAsync(
                 query,
                 retrievedChunkCount,
                 availableCitations,
                 conversationHistory,
-                cancellationToken);
+                cancellationToken,
+                _ragOptions.AllowModelKnowledgeFallback && !retrieval.HadFailure);
             contextCharacterCount = answerResult.ContextCharacterCount;
             promptCharacterCount = answerResult.PromptCharacterCount;
             var citedCitationNumbers = answerResult.CitationNumbers.ToHashSet();
             var citedSources = availableCitations
                 .Where(citation => citedCitationNumbers.Contains(citation.CitationNumber))
                 .ToList();
+            var persistedAnswer = answerResult.AnswerSource == RagAnswerSource.ModelKnowledge
+                ? $"Model knowledge (no supporting documents found):\n{answerResult.Answer}"
+                : answerResult.Answer;
             var persistedConversationId = await _conversationMessageService.AppendRagExchangeAsync(
                 conversationId,
                 query,
-                answerResult.Answer,
+                persistedAnswer,
                 citedSources,
                 cancellationToken)
                 ?? throw new KeyNotFoundException("Conversation was not found.");
@@ -135,7 +139,8 @@ public sealed class RagService : IRagService
             {
                 ConversationId = persistedConversationId,
                 Answer = answerResult.Answer,
-                Citations = citedSources
+                Citations = citedSources,
+                AnswerSource = answerResult.AnswerSource
             };
         }
         catch (Exception ex)
@@ -179,7 +184,7 @@ public sealed class RagService : IRagService
         return response;
     }
 
-    private async Task<IReadOnlyList<VectorSearchResult>> RetrieveAsync(
+    private async Task<(IReadOnlyList<VectorSearchResult> Results, bool HadFailure)> RetrieveAsync(
         string query,
         int topK,
         CancellationToken cancellationToken,
@@ -188,7 +193,7 @@ public sealed class RagService : IRagService
         if (!_ragOptions.UseHybridSearch)
         {
             var vectorResponse = await _vectorSearchService.SearchAsync(query, topK, cancellationToken, tags: tags);
-            return vectorResponse.Results;
+            return (vectorResponse.Results, false);
         }
 
         IReadOnlyList<HybridSearchResult> hybridResults;
@@ -204,20 +209,20 @@ public sealed class RagService : IRagService
         {
             _logger.LogWarning(ex, "Hybrid search failed; falling back to vector search.");
             var fallback = await _vectorSearchService.SearchAsync(query, topK, cancellationToken, tags: tags);
-            return fallback.Results;
+            return (fallback.Results, true);
         }
 
         if (hybridResults.Count == 0)
         {
             _logger.LogWarning("Hybrid search returned no results; falling back to vector search.");
             var fallback = await _vectorSearchService.SearchAsync(query, topK, cancellationToken, tags: tags);
-            return fallback.Results;
+            return (fallback.Results, false);
         }
 
         var baseline = MapHybridResults(hybridResults);
         if (!_ragOptions.UseReranking)
         {
-            return baseline;
+            return (baseline, false);
         }
 
         try
@@ -227,7 +232,7 @@ public sealed class RagService : IRagService
             if (expanded.Count == 0)
             {
                 _logger.LogWarning("Expanded hybrid search returned no candidates; using original hybrid ranking.");
-                return baseline;
+                return (baseline, false);
             }
 
             var candidates = MapHybridResults(expanded);
@@ -239,7 +244,7 @@ public sealed class RagService : IRagService
                 throw new InvalidOperationException("Reranking returned an invalid candidate set.");
             }
 
-            return ranked.Take(topK).ToList();
+            return (ranked.Take(topK).ToList(), false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -248,7 +253,7 @@ public sealed class RagService : IRagService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Reranking failed; using original hybrid ranking.");
-            return baseline;
+            return (baseline, true);
         }
     }
 

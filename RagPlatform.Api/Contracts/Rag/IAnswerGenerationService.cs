@@ -9,5 +9,6 @@ public interface IAnswerGenerationService
         int retrievedChunkCount,
         IReadOnlyList<RagCitationDto> citations,
         IReadOnlyList<ConversationMessageResponse> conversationHistory,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        bool allowModelKnowledgeFallback = false);
 }

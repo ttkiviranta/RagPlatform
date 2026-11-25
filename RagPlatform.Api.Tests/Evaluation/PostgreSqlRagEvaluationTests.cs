@@ -205,6 +205,31 @@ public sealed class PostgreSqlRagEvaluationTests : PostgreSqlTestClassBase
     }
 
     [TestMethod]
+    public async Task RagQuery_ModelKnowledge_PersistsLabeledAnswerWithoutCitations()
+    {
+        using var dbContext = CreateDbContext();
+        var owner = await AddUserAsync(dbContext, "evaluation-model-knowledge-tenant", RoleNames.User);
+        var chat = new RagQualityHardeningTests.CapturingChatCompletionService
+        {
+            Response = new FoundryChatCompletionResponse { Answer = "Helsinki." }
+        };
+        var answer = EvaluationFixture.CreateAnswerService(chat);
+        var service = CreateRagService(dbContext, owner, [], answer, allowModelKnowledgeFallback: true);
+
+        var response = await service.QueryAsync("What is the capital of Finland?");
+
+        Assert.AreEqual("Helsinki.", response.Answer);
+        Assert.AreEqual(RagAnswerSource.ModelKnowledge, response.AnswerSource);
+        Assert.AreEqual(0, response.Citations.Count);
+        var messages = await dbContext.ConversationMessages.AsNoTracking()
+            .Where(message => message.ConversationId == response.ConversationId).ToListAsync();
+        Assert.AreEqual(2, messages.Count);
+        Assert.AreEqual("Model knowledge (no supporting documents found):\nHelsinki.", messages.Single(message => message.Role == ConversationMessageRole.Assistant).Content);
+        Assert.AreEqual(0, await dbContext.ConversationCitations.CountAsync());
+        Assert.AreEqual(1, chat.CallCount);
+    }
+
+    [TestMethod]
     [DataRow(499, false)]
     [DataRow(500, false)]
     [DataRow(501, false)]
@@ -361,7 +386,8 @@ public sealed class PostgreSqlRagEvaluationTests : PostgreSqlTestClassBase
         ApplicationDbContext dbContext,
         User currentUser,
         IReadOnlyList<VectorSearchResult> results,
-        RecordingAnswerGenerationService answer)
+        IAnswerGenerationService answer,
+        bool allowModelKnowledgeFallback = false)
     {
         var currentUserService = new EvaluationCurrentUserService(currentUser);
         var access = CreateDocumentAccessService(dbContext, currentUserService);
@@ -374,7 +400,7 @@ public sealed class PostgreSqlRagEvaluationTests : PostgreSqlTestClassBase
             new FixedVectorSearchService(results),
             new EmptyHybridSearchService(),
             new NoOpRerankingService(),
-            Microsoft.Extensions.Options.Options.Create(new RagOptions { UseHybridSearch = false }),
+            Microsoft.Extensions.Options.Options.Create(new RagOptions { UseHybridSearch = false, AllowModelKnowledgeFallback = allowModelKnowledgeFallback }),
             citation,
             new NoOpTelemetryService(),
             currentUserService,
@@ -449,7 +475,8 @@ public sealed class PostgreSqlRagEvaluationTests : PostgreSqlTestClassBase
             int retrievedChunkCount,
             IReadOnlyList<RagCitationDto> citations,
             IReadOnlyList<ConversationMessageResponse> conversationHistory,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            bool allowModelKnowledgeFallback = false)
         {
             ReceivedCitations = citations;
             return _error is null
