@@ -102,6 +102,54 @@ public sealed class PostgreSqlHybridSearchServiceTests : PostgreSqlTestClassBase
         Assert.IsTrue(results[0].FoundByFullTextSearch);
     }
 
+    [TestMethod]
+    public async Task SearchAsync_Tags_FilterBeforeRankingAndRespectDocumentAccess()
+    {
+        using var dbContext = CreateDbContext();
+        var owner = PostgreSqlTestData.CreateUser(TenantId);
+        var other = PostgreSqlTestData.CreateUser(TenantId);
+        var foreign = PostgreSqlTestData.CreateUser("foreign-tenant");
+        dbContext.Users.AddRange(owner, other, foreign);
+        await dbContext.SaveChangesAsync();
+
+        var partial = await AddCandidateAsync(dbContext, "tagmarker partial", [1f, 0f], ownerUserId: owner.Id);
+        var match = await AddCandidateAsync(dbContext, "tagmarker match", [0.8f, 0.6f], ownerUserId: owner.Id);
+        var textOnly = await AddCandidateAsync(dbContext, "tagmarker text only", null, ownerUserId: owner.Id);
+        var inaccessible = await AddCandidateAsync(dbContext, "tagmarker other owner", [1f, 0f], ownerUserId: other.Id);
+        var foreignDocument = await AddCandidateAsync(dbContext, "tagmarker foreign", [1f, 0f], tenantId: foreign.TenantId, ownerUserId: foreign.Id);
+        dbContext.DocumentTags.Add(new DocumentTag { DocumentId = partial.DocumentId, Name = "alpha" });
+        foreach (var id in new[] { match.DocumentId, textOnly.DocumentId, inaccessible.DocumentId, foreignDocument.DocumentId })
+        {
+            dbContext.DocumentTags.AddRange(
+                new DocumentTag { DocumentId = id, Name = "alpha" },
+                new DocumentTag { DocumentId = id, Name = "beta" });
+        }
+        await dbContext.SaveChangesAsync();
+
+        var currentUser = new User { Id = owner.Id, TenantId = TenantId };
+        currentUser.UserRoles.Add(new UserRole { UserId = owner.Id, RoleName = RoleNames.User });
+        var vector = CreateVectorService(dbContext, new FakeDocumentAccessService(currentUser));
+        var hybrid = CreateService(dbContext, currentUser);
+
+        var unfiltered = await vector.SearchAsync("tagmarker", topK: 1);
+        Assert.AreEqual(partial.ChunkId, unfiltered.Results.Single().ChunkId);
+        var empty = await vector.SearchAsync("tagmarker", topK: 1, tags: []);
+        Assert.AreEqual(partial.ChunkId, empty.Results.Single().ChunkId);
+        var filtered = await vector.SearchAsync("tagmarker", topK: 1, tags: [" alpha ", "beta"]);
+        Assert.AreEqual(match.ChunkId, filtered.Results.Single().ChunkId);
+        Assert.AreEqual(0, (await vector.SearchAsync("tagmarker", tags: ["Alpha"])).Results.Count);
+        Assert.AreEqual(0, (await vector.SearchAsync("tagmarker", documentId: partial.DocumentId, tags: ["alpha", "beta"])).Results.Count);
+
+        var results = await hybrid.SearchAsync("tagmarker", topK: 5, tags: ["alpha", "beta"]);
+        CollectionAssert.AreEquivalent(new[] { match.ChunkId, textOnly.ChunkId }, results.Select(result => result.ChunkId).ToArray());
+        Assert.IsTrue(results.Single(result => result.ChunkId == match.ChunkId).FoundByVectorSearch);
+        Assert.IsTrue(results.Single(result => result.ChunkId == match.ChunkId).FoundByFullTextSearch);
+        Assert.IsFalse(results.Single(result => result.ChunkId == textOnly.ChunkId).FoundByVectorSearch);
+        Assert.IsTrue(results.Single(result => result.ChunkId == textOnly.ChunkId).FoundByFullTextSearch);
+        Assert.AreEqual(0, (await hybrid.SearchAsync("tagmarker", documentId: inaccessible.DocumentId, tags: ["alpha", "beta"])).Count);
+        Assert.AreEqual(0, (await hybrid.SearchAsync("tagmarker", documentId: match.DocumentId, tags: ["missing"])).Count);
+    }
+
     private static ApplicationDbContext CreateDbContext()
     {
         return new ApplicationDbContext(TestDbContextOptions.Create());
@@ -120,14 +168,7 @@ public sealed class PostgreSqlHybridSearchServiceTests : PostgreSqlTestClassBase
         }
 
         var documentAccessService = new FakeDocumentAccessService(currentUser);
-        var vectorSearchService = new VectorSearchService(
-            dbContext,
-            documentAccessService,
-            new FixedEmbeddingProvider(),
-            new NoOpTelemetryService(),
-            new NoOpAuditEventWriter(),
-            NullLogger<VectorSearchService>.Instance,
-            Microsoft.Extensions.Options.Options.Create(new FoundryOptions { EmbeddingDimensions = 2 }));
+        var vectorSearchService = CreateVectorService(dbContext, documentAccessService);
         var fullTextSearchService = new FullTextSearchService(
             dbContext,
             documentAccessService,
@@ -138,6 +179,11 @@ public sealed class PostgreSqlHybridSearchServiceTests : PostgreSqlTestClassBase
             fullTextSearchService,
             NullLogger<HybridSearchService>.Instance);
     }
+
+    private static VectorSearchService CreateVectorService(ApplicationDbContext dbContext, IDocumentAccessService access) =>
+        new(dbContext, access, new FixedEmbeddingProvider(), new NoOpTelemetryService(), new NoOpAuditEventWriter(),
+            NullLogger<VectorSearchService>.Instance,
+            Microsoft.Extensions.Options.Options.Create(new FoundryOptions { EmbeddingDimensions = 2 }));
 
     private static async Task<CandidateFixture> SeedCandidatesAsync(ApplicationDbContext dbContext)
     {

@@ -40,7 +40,8 @@ public sealed class SearchEndpointTests
         {
             Query = "dead-letter queue",
             TopK = 3,
-            DocumentId = DocumentId
+            DocumentId = DocumentId,
+            Tags = ["alpha", "beta"]
         });
 
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
@@ -54,6 +55,7 @@ public sealed class SearchEndpointTests
             Assert.AreEqual("full text", results[0].Content);
             Assert.AreEqual(0.75f, results[0].RankScore);
             Assert.AreEqual(("dead-letter queue", 3, (Guid?)DocumentId), fullText.LastRequest);
+            CollectionAssert.AreEqual(new[] { "alpha", "beta" }, fullText.LastTags!.ToArray());
             Assert.IsNull(hybrid.LastRequest);
         }
         else
@@ -67,6 +69,7 @@ public sealed class SearchEndpointTests
             Assert.IsTrue(results[0].FoundByVectorSearch);
             Assert.IsFalse(results[0].FoundByFullTextSearch);
             Assert.AreEqual(("dead-letter queue", 3, (Guid?)DocumentId), hybrid.LastRequest);
+            CollectionAssert.AreEqual(new[] { "alpha", "beta" }, hybrid.LastTags!.ToArray());
             Assert.IsNull(fullText.LastRequest);
         }
     }
@@ -238,12 +241,15 @@ public sealed class SearchEndpointTests
     private sealed class FakeFullTextSearchService : IFullTextSearchService
     {
         public (string Query, int TopK, Guid? DocumentId)? LastRequest { get; private set; }
+        public IReadOnlyCollection<string?>? LastTags { get; private set; }
         public bool Fail { get; init; }
 
         public Task<IReadOnlyList<FullTextSearchResult>> SearchAsync(
-            string query, int topK = 5, CancellationToken cancellationToken = default, Guid? documentId = null)
+            string query, int topK = 5, CancellationToken cancellationToken = default, Guid? documentId = null,
+            IReadOnlyCollection<string?>? tags = null)
         {
             LastRequest = (query, topK, documentId);
+            LastTags = tags;
             if (Fail) throw new InvalidOperationException("sensitive failure");
             return Task.FromResult<IReadOnlyList<FullTextSearchResult>>(
                 [new FullTextSearchResult { ChunkId = ChunkId, DocumentId = DocumentId, Content = "full text", RankScore = 0.75f }]);
@@ -253,12 +259,15 @@ public sealed class SearchEndpointTests
     private sealed class FakeHybridSearchService : IHybridSearchService
     {
         public (string Query, int TopK, Guid? DocumentId)? LastRequest { get; private set; }
+        public IReadOnlyCollection<string?>? LastTags { get; private set; }
         public bool Fail { get; init; }
 
         public Task<IReadOnlyList<HybridSearchResult>> SearchAsync(
-            string query, int topK = 5, CancellationToken cancellationToken = default, Guid? documentId = null)
+            string query, int topK = 5, CancellationToken cancellationToken = default, Guid? documentId = null,
+            IReadOnlyCollection<string?>? tags = null)
         {
             LastRequest = (query, topK, documentId);
+            LastTags = tags;
             if (Fail) throw new InvalidOperationException("sensitive failure");
             return Task.FromResult<IReadOnlyList<HybridSearchResult>>(
                 [new HybridSearchResult { ChunkId = ChunkId, DocumentId = DocumentId, Content = "hybrid content", FoundByVectorSearch = true }]);

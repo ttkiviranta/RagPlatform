@@ -25,10 +25,11 @@ public sealed class RagServiceRetrievalTests
         var citation = new CapturingCitationService();
         var service = CreateService(vector, hybrid, citation, useHybridSearch: false);
 
-        await service.QueryAsync("question", topK: 5);
+        await service.QueryAsync("question", topK: 5, tags: [" beta ", "alpha"]);
 
         Assert.AreEqual(1, vector.CallCount);
         Assert.AreEqual(0, hybrid.CallCount);
+        CollectionAssert.AreEqual(new[] { "alpha", "beta" }, vector.LastTags!.ToArray());
         Assert.AreEqual(1, citation.ReceivedResults.Count);
     }
 
@@ -40,10 +41,11 @@ public sealed class RagServiceRetrievalTests
         var citation = new CapturingCitationService();
         var service = CreateService(vector, hybrid, citation, useHybridSearch: true);
 
-        await service.QueryAsync("question", topK: 5);
+        await service.QueryAsync("question", topK: 5, tags: [" beta ", "alpha"]);
 
         Assert.AreEqual(0, vector.CallCount);
         Assert.AreEqual(1, hybrid.CallCount);
+        CollectionAssert.AreEqual(new[] { "alpha", "beta" }, hybrid.LastTags!.ToArray());
         Assert.AreEqual(1, citation.ReceivedResults.Count);
         Assert.AreEqual(hybrid.Results[0].ChunkId, citation.ReceivedResults[0].ChunkId);
     }
@@ -55,10 +57,12 @@ public sealed class RagServiceRetrievalTests
         var hybrid = new FakeHybridSearchService(Array.Empty<HybridSearchResult>()) { Error = new InvalidOperationException("hybrid failed") };
         var service = CreateService(vector, hybrid, new CapturingCitationService(), useHybridSearch: true);
 
-        await service.QueryAsync("question", topK: 5);
+        await service.QueryAsync("question", topK: 5, tags: [" beta ", "alpha"]);
 
         Assert.AreEqual(1, vector.CallCount);
         Assert.AreEqual(1, hybrid.CallCount);
+        CollectionAssert.AreEqual(new[] { "alpha", "beta" }, hybrid.LastTags!.ToArray());
+        CollectionAssert.AreEqual(new[] { "alpha", "beta" }, vector.LastTags!.ToArray());
     }
 
     [TestMethod]
@@ -68,10 +72,27 @@ public sealed class RagServiceRetrievalTests
         var hybrid = new FakeHybridSearchService(Array.Empty<HybridSearchResult>());
         var service = CreateService(vector, hybrid, new CapturingCitationService(), useHybridSearch: true);
 
-        await service.QueryAsync("question", topK: 5);
+        await service.QueryAsync("question", topK: 5, tags: ["alpha"]);
 
         Assert.AreEqual(1, vector.CallCount);
         Assert.AreEqual(1, hybrid.CallCount);
+        CollectionAssert.AreEqual(new[] { "alpha" }, hybrid.LastTags!.ToArray());
+        CollectionAssert.AreEqual(new[] { "alpha" }, vector.LastTags!.ToArray());
+    }
+
+    [TestMethod]
+    public async Task QueryAsync_InvalidTags_DoesNotRetrieveOrFallBack()
+    {
+        var vector = new FakeVectorSearchService(CreateVectorResult());
+        var hybrid = new FakeHybridSearchService(Array.Empty<HybridSearchResult>());
+        var service = CreateService(vector, hybrid, new CapturingCitationService(), useHybridSearch: true);
+
+        var error = await Assert.ThrowsExactlyAsync<ArgumentException>(
+            () => service.QueryAsync("question", tags: ["tag", " tag "]));
+
+        Assert.AreEqual("tags", error.ParamName);
+        Assert.AreEqual(0, vector.CallCount);
+        Assert.AreEqual(0, hybrid.CallCount);
     }
 
     [TestMethod]
@@ -137,14 +158,17 @@ public sealed class RagServiceRetrievalTests
     private sealed class FakeVectorSearchService(params VectorSearchResult[] results) : IVectorSearchService
     {
         public int CallCount { get; private set; }
+        public IReadOnlyCollection<string?>? LastTags { get; private set; }
 
         public Task<VectorSearchResponse> SearchAsync(
             string query,
             int topK = 5,
             CancellationToken cancellationToken = default,
-            Guid? documentId = null)
+            Guid? documentId = null,
+            IReadOnlyCollection<string?>? tags = null)
         {
             CallCount++;
+            LastTags = tags;
             return Task.FromResult(new VectorSearchResponse { Results = results, RequestedTopK = topK });
         }
     }
@@ -154,14 +178,17 @@ public sealed class RagServiceRetrievalTests
         public IReadOnlyList<HybridSearchResult> Results { get; } = results;
         public int CallCount { get; private set; }
         public Exception? Error { get; set; }
+        public IReadOnlyCollection<string?>? LastTags { get; private set; }
 
         public Task<IReadOnlyList<HybridSearchResult>> SearchAsync(
             string query,
             int topK = 5,
             CancellationToken cancellationToken = default,
-            Guid? documentId = null)
+            Guid? documentId = null,
+            IReadOnlyCollection<string?>? tags = null)
         {
             CallCount++;
+            LastTags = tags;
             if (Error is not null)
             {
                 return Task.FromException<IReadOnlyList<HybridSearchResult>>(Error);

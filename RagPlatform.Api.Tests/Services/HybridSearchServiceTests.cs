@@ -174,6 +174,20 @@ public sealed class HybridSearchServiceTests
         Assert.AreEqual(50, fullTextService.LastTopK);
     }
 
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task SearchAsync_Tags_AreNormalizedAndPassedToBothSources()
+    {
+        var vector = new FakeVectorSearchService(CreateVectorResponse());
+        var fullText = new FakeFullTextSearchService();
+        var service = CreateService(vector, fullText);
+
+        await service.SearchAsync("query", tags: [" beta ", "alpha"]);
+
+        CollectionAssert.AreEqual(new[] { "alpha", "beta" }, vector.LastTags!.ToArray());
+        CollectionAssert.AreEqual(new[] { "alpha", "beta" }, fullText.LastTags!.ToArray());
+    }
+
     private static HybridSearchService CreateService(
         FakeVectorSearchService vectorService,
         FakeFullTextSearchService fullTextService)
@@ -214,14 +228,17 @@ public sealed class HybridSearchServiceTests
         public VectorSearchResponse Results { get; } = results;
 
         public int LastTopK { get; private set; }
+        public IReadOnlyCollection<string?>? LastTags { get; private set; }
 
         public Task<VectorSearchResponse> SearchAsync(
             string query,
             int topK = 5,
             CancellationToken cancellationToken = default,
-            Guid? documentId = null)
+            Guid? documentId = null,
+            IReadOnlyCollection<string?>? tags = null)
         {
             LastTopK = topK;
+            LastTags = tags;
             return Task.FromResult(Results);
         }
     }
@@ -229,14 +246,17 @@ public sealed class HybridSearchServiceTests
     private sealed class FakeFullTextSearchService(params FullTextSearchResult[] results) : IFullTextSearchService
     {
         public int LastTopK { get; private set; }
+        public IReadOnlyCollection<string?>? LastTags { get; private set; }
 
         public Task<IReadOnlyList<FullTextSearchResult>> SearchAsync(
             string query,
             int topK = 5,
             CancellationToken cancellationToken = default,
-            Guid? documentId = null)
+            Guid? documentId = null,
+            IReadOnlyCollection<string?>? tags = null)
         {
             LastTopK = topK;
+            LastTags = tags;
             return Task.FromResult<IReadOnlyList<FullTextSearchResult>>(results);
         }
     }

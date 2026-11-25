@@ -259,9 +259,9 @@ Record sanitized evidence and review results against the [Phase 12 acceptance pl
 
 The API includes document CRUD and upload, URL import, document processing/metadata, chunks and embeddings, vector search, RAG query, conversations/messages, and document import status. OpenAPI/Swagger is the interactive API reference when the service is running.
 
-Document create and update requests and web imports accept an optional `tags` array. Text and PDF multipart uploads accept repeated `tags` form fields. Names are trimmed, case-sensitive, 1–100 characters without control characters, and unique per document after trimming; at most 50 tags are allowed. On update, an omitted or `null` value preserves tags and an empty array clears them. Document responses contain a sorted `tags` array; PDF upload and import-status responses keep their status-only format, so use document GET to read tags. Deleting a document deletes its tags. Tags cannot yet be used to filter retrieval.
+Document create and update requests and web imports accept an optional `tags` array. Text and PDF multipart uploads accept repeated `tags` form fields. Names are trimmed, case-sensitive, 1–100 characters without control characters, and unique per document after trimming; at most 50 tags are allowed. On update, an omitted or `null` value preserves tags and an empty array clears them. Document responses contain a sorted `tags` array; PDF upload and import-status responses keep their status-only format, so use document GET to read tags. Deleting a document deletes its tags.
 
-Search endpoints include `POST /api/search/vector`, `POST /api/search/fulltext`, and `POST /api/search/hybrid`. Each accepts `query`, `topK` (1–50, default 5), and an optional `documentId`. Full-text and hybrid searches return arrays of ranked chunks; hybrid results indicate which search sources found each chunk. Hybrid content is a vector snippet for vector-only results and full chunk content for full-text matches.
+Search endpoints include `POST /api/search/vector`, `POST /api/search/fulltext`, and `POST /api/search/hybrid`. Each accepts `query`, `topK` (1–50, default 5), an optional `documentId`, and optional `tags`. `POST /api/rag/query` also accepts `tags`. A document must have every requested tag; names follow the same validation and exact, case-sensitive matching as document tags. Omitted, null, or empty tags do not filter retrieval. Tag and document ID filters are combined with existing tenant and owner access rules, and apply before candidate ranking and to RAG fallback. Full-text and hybrid searches return arrays of ranked chunks; hybrid results indicate which search sources found each chunk. Hybrid content is a vector snippet for vector-only results and full chunk content for full-text matches.
 
 RAG retrieval is controlled by `Rag:UseHybridSearch`. It defaults to `false`, preserving vector-only RAG behavior. When enabled, RAG uses hybrid RRF retrieval; hybrid exceptions or empty results fall back to vector retrieval. Request cancellation is always propagated without fallback.
 
@@ -282,10 +282,7 @@ RAG retrieval is controlled by `Rag:UseHybridSearch`. It defaults to `false`, pr
 - Conversation History
 - PostgreSQL Integration Testing
 - GitHub Actions CI/CD
-
-### In Progress
-
-- Document tags: persistence and API management are implemented; tag-filtered retrieval remains to be implemented.
+- Document tags and all-tags retrieval filtering
 
 ### Planned
 
@@ -295,7 +292,7 @@ RAG retrieval is controlled by `Rag:UseHybridSearch`. It defaults to `false`, pr
 
 ## Next steps
 
-Continue the document-tag learning feature with retrieval filtering. This work does not change Phase 12 or Phase 13 acceptance status.
+Document-tag retrieval filtering does not change Phase 12 or Phase 13 acceptance status.
 
 Complete and record the remaining Phase 12 recovery, isolation, evidence, and operational rollout gates, then complete Phase 13 database, live Foundry, answer-quality, security, and operational acceptance. The previously identified Phase 14–17 themes (Copilot Studio integration, GraphRAG, administration, and AI engineering/operations) remain roadmap items rather than current implementation scope; the proposed sequencing below is not yet approved.
 

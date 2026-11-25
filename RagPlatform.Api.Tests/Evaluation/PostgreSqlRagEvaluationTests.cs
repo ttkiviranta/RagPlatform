@@ -416,7 +416,8 @@ public sealed class PostgreSqlRagEvaluationTests : PostgreSqlTestClassBase
             string query,
             int topK = 5,
             CancellationToken cancellationToken = default,
-            Guid? documentId = null) =>
+            Guid? documentId = null,
+            IReadOnlyCollection<string?>? tags = null) =>
             Task.FromResult(new VectorSearchResponse { Results = results, RequestedTopK = topK });
     }
 
@@ -426,7 +427,8 @@ public sealed class PostgreSqlRagEvaluationTests : PostgreSqlTestClassBase
             string query,
             int topK = 5,
             CancellationToken cancellationToken = default,
-            Guid? documentId = null) =>
+            Guid? documentId = null,
+            IReadOnlyCollection<string?>? tags = null) =>
             Task.FromResult<IReadOnlyList<HybridSearchResult>>(Array.Empty<HybridSearchResult>());
     }
 
