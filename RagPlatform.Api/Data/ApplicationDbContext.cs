@@ -14,6 +14,8 @@ public sealed class ApplicationDbContext : DbContext
 
     public DbSet<Document> Documents => Set<Document>();
 
+    public DbSet<DocumentTag> DocumentTags => Set<DocumentTag>();
+
     public DbSet<DocumentMetadata> DocumentMetadata => Set<DocumentMetadata>();
 
     public DbSet<DocumentChunk> DocumentChunks => Set<DocumentChunk>();
@@ -86,6 +88,20 @@ public sealed class ApplicationDbContext : DbContext
                 .WithOne(chunk => chunk.Document)
                 .HasForeignKey(chunk => chunk.DocumentId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(document => document.Tags)
+                .WithOne(tag => tag.Document)
+                .HasForeignKey(tag => tag.DocumentId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DocumentTag>(entity =>
+        {
+            entity.HasKey(tag => tag.Id);
+            entity.Property(tag => tag.Name)
+                .IsRequired()
+                .HasMaxLength(100);
+            entity.HasIndex(tag => new { tag.DocumentId, tag.Name })
+                .IsUnique();
         });
 
         modelBuilder.Entity<DocumentMetadata>(entity =>

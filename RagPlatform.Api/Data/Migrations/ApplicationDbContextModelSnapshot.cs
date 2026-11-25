@@ -420,6 +420,28 @@ namespace RagPlatform.Api.Data.Migrations
                     b.ToTable("DocumentMetadata");
                 });
 
+            modelBuilder.Entity("RagPlatform.Api.Models.DocumentTag", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocumentId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("DocumentTags");
+                });
+
             modelBuilder.Entity("RagPlatform.Api.Models.Role", b =>
                 {
                     b.Property<string>("Name")
@@ -625,6 +647,17 @@ namespace RagPlatform.Api.Data.Migrations
                     b.Navigation("Document");
                 });
 
+            modelBuilder.Entity("RagPlatform.Api.Models.DocumentTag", b =>
+                {
+                    b.HasOne("RagPlatform.Api.Models.Document", "Document")
+                        .WithMany("Tags")
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Document");
+                });
+
             modelBuilder.Entity("RagPlatform.Api.Models.UserRole", b =>
                 {
                     b.HasOne("RagPlatform.Api.Models.Role", "Role")
@@ -659,6 +692,8 @@ namespace RagPlatform.Api.Data.Migrations
                     b.Navigation("Chunks");
 
                     b.Navigation("Metadata");
+
+                    b.Navigation("Tags");
                 });
 
             modelBuilder.Entity("RagPlatform.Api.Models.DocumentChunk", b =>

@@ -35,6 +35,9 @@ public sealed class Document
     public string TenantId { get; set; } = string.Empty;
 
     [JsonIgnore]
+    public ICollection<DocumentTag> Tags { get; set; } = new List<DocumentTag>();
+
+    [JsonIgnore]
     public DocumentMetadata? Metadata { get; set; }
 
     [JsonIgnore]

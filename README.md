@@ -259,6 +259,8 @@ Record sanitized evidence and review results against the [Phase 12 acceptance pl
 
 The API includes document CRUD and upload, URL import, document processing/metadata, chunks and embeddings, vector search, RAG query, conversations/messages, and document import status. OpenAPI/Swagger is the interactive API reference when the service is running.
 
+The database also has a document-tag persistence foundation: each tag belongs to one document, has a name of at most 100 characters, and is unique by exact name within that document. Deleting a document deletes its tags. Tags cannot yet be managed through the API or used to filter retrieval.
+
 Search endpoints include `POST /api/search/vector`, `POST /api/search/fulltext`, and `POST /api/search/hybrid`. Each accepts `query`, `topK` (1–50, default 5), and an optional `documentId`. Full-text and hybrid searches return arrays of ranked chunks; hybrid results indicate which search sources found each chunk. Hybrid content is a vector snippet for vector-only results and full chunk content for full-text matches.
 
 RAG retrieval is controlled by `Rag:UseHybridSearch`. It defaults to `false`, preserving vector-only RAG behavior. When enabled, RAG uses hybrid RRF retrieval; hybrid exceptions or empty results fall back to vector retrieval. Request cancellation is always propagated without fallback.
@@ -273,6 +275,7 @@ RAG retrieval is controlled by `Rag:UseHybridSearch`. It defaults to `false`, pr
 - HybridSearchService
 - Full-text and hybrid search APIs
 - Reciprocal Rank Fusion (RRF)
+- RAG retrieval backed by Hybrid Search (optional; vector remains the default)
 - Document Ingestion Pipeline
 - Semantic Search
 - Citations
@@ -282,16 +285,17 @@ RAG retrieval is controlled by `Rag:UseHybridSearch`. It defaults to `false`, pr
 
 ### In Progress
 
-- None
+- Document tags: persistence foundation added; tag management and tag-filtered retrieval remain to be implemented.
 
 ### Planned
 
-- RAG retrieval backed by Hybrid Search
 - Reranking
 - Search quality evaluation
 - Additional retrieval strategies
 
 ## Next steps
+
+Continue the document-tag learning feature with authorized tag management and retrieval filtering. This work does not change Phase 12 or Phase 13 acceptance status.
 
 Complete and record the remaining Phase 12 recovery, isolation, evidence, and operational rollout gates, then complete Phase 13 database, live Foundry, answer-quality, security, and operational acceptance. The previously identified Phase 14–17 themes (Copilot Studio integration, GraphRAG, administration, and AI engineering/operations) remain roadmap items rather than current implementation scope; the proposed sequencing below is not yet approved.
 

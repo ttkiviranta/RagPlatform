@@ -37,6 +37,69 @@ public sealed class PostgreSqlRagEvaluationTests : PostgreSqlTestClassBase
     }
 
     [TestMethod]
+    public async Task DocumentTags_PersistAndCascadeWhenDocumentIsDeleted()
+    {
+        using var dbContext = CreateDbContext();
+        var owner = await AddUserAsync(dbContext, "evaluation-tags-tenant", RoleNames.User);
+        var document = new Document
+        {
+            Title = "tagged.txt",
+            Content = "Synthetic tagged document.",
+            FileName = "tagged.txt",
+            ContentType = "text/plain",
+            FileSize = 25,
+            TenantId = owner.TenantId,
+            OwnerUserId = owner.Id,
+            Tags = [new DocumentTag { Name = "security" }, new DocumentTag { Name = "identity" }]
+        };
+
+        var otherDocument = new Document
+        {
+            Title = "other.txt",
+            Content = "Another synthetic document.",
+            TenantId = owner.TenantId,
+            OwnerUserId = owner.Id,
+            Tags = [new DocumentTag { Name = "security" }]
+        };
+        dbContext.Documents.AddRange(document, otherDocument);
+        await dbContext.SaveChangesAsync();
+        dbContext.ChangeTracker.Clear();
+
+        var persisted = await dbContext.Documents
+            .Include(item => item.Tags)
+            .SingleAsync(item => item.Id == document.Id);
+        CollectionAssert.AreEquivalent(new[] { "security", "identity" }, persisted.Tags.Select(tag => tag.Name).ToArray());
+        Assert.IsTrue(persisted.Tags.All(tag => tag.DocumentId == document.Id));
+
+        dbContext.ChangeTracker.Clear();
+        await dbContext.Documents.Where(item => item.Id == document.Id).ExecuteDeleteAsync();
+        Assert.AreEqual(0, await dbContext.DocumentTags.CountAsync(tag => tag.DocumentId == document.Id));
+        Assert.AreEqual(1, await dbContext.DocumentTags.CountAsync(tag => tag.DocumentId == otherDocument.Id));
+    }
+
+    [TestMethod]
+    public async Task DocumentTags_DuplicateNameForDocumentIsRejected()
+    {
+        using var dbContext = CreateDbContext();
+        var owner = await AddUserAsync(dbContext, "evaluation-tag-uniqueness-tenant", RoleNames.User);
+        var document = new Document
+        {
+            Title = "duplicate.txt",
+            Content = "Synthetic document.",
+            TenantId = owner.TenantId,
+            OwnerUserId = owner.Id,
+            Tags = [new DocumentTag { Name = "security" }]
+        };
+        dbContext.Documents.Add(document);
+        await dbContext.SaveChangesAsync();
+        dbContext.DocumentTags.Add(new DocumentTag { DocumentId = document.Id, Name = "security" });
+
+        var exception = await Assert.ThrowsExactlyAsync<DbUpdateException>(() => dbContext.SaveChangesAsync());
+        Assert.IsInstanceOfType<Npgsql.PostgresException>(exception.InnerException);
+        Assert.AreEqual(Npgsql.PostgresErrorCodes.UniqueViolation, ((Npgsql.PostgresException)exception.InnerException!).SqlState);
+    }
+
+    [TestMethod]
     public async Task CitationService_CrossTenantIsolation_ExcludesOtherTenantEvidence()
     {
         using var dbContext = CreateDbContext();
