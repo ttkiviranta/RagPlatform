@@ -265,6 +265,8 @@ Search endpoints include `POST /api/search/vector`, `POST /api/search/fulltext`,
 
 RAG retrieval is controlled by `Rag:UseHybridSearch`. It defaults to `false`, preserving vector-only RAG behavior. When enabled, RAG uses hybrid RRF retrieval; hybrid exceptions or empty results fall back to vector retrieval. Request cancellation is always propagated without fallback.
 
+A reranking contract and pass-through placeholder are available for planned RAG reranking. `Rag:UseReranking` defaults to `false` and is not connected to retrieval yet; setting it to `true` currently has no effect and makes no additional model calls.
+
 ## Roadmap
 
 ### Completed
@@ -286,7 +288,7 @@ RAG retrieval is controlled by `Rag:UseHybridSearch`. It defaults to `false`, pr
 
 ### Planned
 
-- Reranking
+- Reranking (contract and placeholder only; no model integration yet)
 - Search quality evaluation
 - Additional retrieval strategies
 
