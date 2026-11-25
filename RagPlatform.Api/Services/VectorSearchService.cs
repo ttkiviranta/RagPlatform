@@ -46,7 +46,8 @@ public sealed class VectorSearchService : IVectorSearchService
         string query,
         int topK = 5,
         CancellationToken cancellationToken = default,
-        Guid? documentId = null)
+        Guid? documentId = null,
+        IReadOnlyCollection<string?>? tags = null)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
@@ -58,6 +59,7 @@ public sealed class VectorSearchService : IVectorSearchService
             throw new ArgumentOutOfRangeException(nameof(topK), "TopK must be between 1 and 50.");
         }
 
+        var tagNames = DocumentTagNames.Normalize(tags);
         var stopwatch = Stopwatch.StartNew();
         User? currentUser = null;
         var embeddingModelName = "unknown";
@@ -88,9 +90,13 @@ public sealed class VectorSearchService : IVectorSearchService
             }
 
             var queryEmbedding = new Vector(queryVector.ToArray());
-            var accessibleDocumentIds = _documentAccessService
-                .ScopeDocuments(_dbContext.Documents.AsNoTracking(), currentUser)
-                .Select(document => document.Id);
+            var accessibleDocuments = _documentAccessService
+                .ScopeDocuments(_dbContext.Documents.AsNoTracking(), currentUser);
+            foreach (var tagName in tagNames)
+            {
+                accessibleDocuments = accessibleDocuments.Where(document => document.Tags.Any(tag => tag.Name == tagName));
+            }
+            var accessibleDocumentIds = accessibleDocuments.Select(document => document.Id);
 
             var embeddingQuery = _dbContext.DocumentEmbeddings
                 .AsNoTracking()

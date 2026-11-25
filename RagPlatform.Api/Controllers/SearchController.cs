@@ -54,7 +54,7 @@ public sealed class SearchController : ControllerBase
 
     private async Task<ActionResult<IReadOnlyList<TResult>>> ExecuteAsync<TResult>(
         VectorSearchRequest request,
-        Func<string, int, CancellationToken, Guid?, Task<IReadOnlyList<TResult>>> search,
+        Func<string, int, CancellationToken, Guid?, IReadOnlyCollection<string?>?, Task<IReadOnlyList<TResult>>> search,
         string searchName,
         CancellationToken cancellationToken)
     {
@@ -65,7 +65,7 @@ public sealed class SearchController : ControllerBase
 
         try
         {
-            var results = await search(request.Query, request.TopK, cancellationToken, request.DocumentId);
+            var results = await search(request.Query, request.TopK, cancellationToken, request.DocumentId, request.Tags);
             return Ok(results);
         }
         catch (ArgumentOutOfRangeException ex)
@@ -75,7 +75,7 @@ public sealed class SearchController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            ModelState.AddModelError(nameof(VectorSearchRequest.Query), ex.Message);
+            ModelState.AddModelError(ex.ParamName == "tags" ? "tags" : nameof(VectorSearchRequest.Query), ex.Message);
             return ValidationProblem(ModelState);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

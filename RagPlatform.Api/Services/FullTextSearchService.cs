@@ -27,7 +27,8 @@ public sealed class FullTextSearchService : IFullTextSearchService
         string query,
         int topK = 5,
         CancellationToken cancellationToken = default,
-        Guid? documentId = null)
+        Guid? documentId = null,
+        IReadOnlyCollection<string?>? tags = null)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
@@ -39,11 +40,16 @@ public sealed class FullTextSearchService : IFullTextSearchService
             throw new ArgumentOutOfRangeException(nameof(topK), "TopK must be between 1 and 50.");
         }
 
+        var tagNames = DocumentTagNames.Normalize(tags);
         var stopwatch = Stopwatch.StartNew();
         var currentUser = await _documentAccessService.GetRequiredCurrentUserAsync(cancellationToken);
-        var accessibleDocumentIds = _documentAccessService
-            .ScopeDocuments(_dbContext.Documents.AsNoTracking(), currentUser)
-            .Select(document => document.Id);
+        var accessibleDocuments = _documentAccessService
+            .ScopeDocuments(_dbContext.Documents.AsNoTracking(), currentUser);
+        foreach (var tagName in tagNames)
+        {
+            accessibleDocuments = accessibleDocuments.Where(document => document.Tags.Any(tag => tag.Name == tagName));
+        }
+        var accessibleDocumentIds = accessibleDocuments.Select(document => document.Id);
 
         var chunkQuery = _dbContext.DocumentChunks
             .AsNoTracking()

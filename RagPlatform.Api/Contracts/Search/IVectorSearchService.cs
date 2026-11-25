@@ -6,5 +6,6 @@ public interface IVectorSearchService
         string query,
         int topK = 5,
         CancellationToken cancellationToken = default,
-        Guid? documentId = null);
+        Guid? documentId = null,
+        IReadOnlyCollection<string?>? tags = null);
 }

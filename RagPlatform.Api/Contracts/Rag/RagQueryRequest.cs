@@ -12,4 +12,6 @@ public sealed class RagQueryRequest
     public int TopK { get; set; } = 5;
 
     public Guid? ConversationId { get; set; }
+
+    public List<string?>? Tags { get; set; }
 }

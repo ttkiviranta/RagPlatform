@@ -47,7 +47,8 @@ public sealed class RagController : ControllerBase
                 request.Query,
                 request.TopK,
                 cancellationToken,
-                request.ConversationId);
+                request.ConversationId,
+                request.Tags);
             return Ok(response);
         }
         catch (KeyNotFoundException)
@@ -61,7 +62,7 @@ public sealed class RagController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            ModelState.AddModelError(nameof(RagQueryRequest.Query), ex.Message);
+            ModelState.AddModelError(ex.ParamName == "tags" ? "tags" : nameof(RagQueryRequest.Query), ex.Message);
             return ValidationProblem(ModelState);
         }
         catch (Exception ex)

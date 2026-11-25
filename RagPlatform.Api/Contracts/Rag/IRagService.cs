@@ -6,5 +6,6 @@ public interface IRagService
         string query,
         int topK = 5,
         CancellationToken cancellationToken = default,
-        Guid? conversationId = null);
+        Guid? conversationId = null,
+        IReadOnlyCollection<string?>? tags = null);
 }

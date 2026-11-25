@@ -26,7 +26,8 @@ public sealed class HybridSearchService : IHybridSearchService
         string query,
         int topK = 5,
         CancellationToken cancellationToken = default,
-        Guid? documentId = null)
+        Guid? documentId = null,
+        IReadOnlyCollection<string?>? tags = null)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
@@ -38,17 +39,20 @@ public sealed class HybridSearchService : IHybridSearchService
             throw new ArgumentOutOfRangeException(nameof(topK), "TopK must be between 1 and 50.");
         }
 
+        var tagNames = DocumentTagNames.Normalize(tags);
         var candidateCount = Math.Min(topK * CandidateMultiplier, MaximumCandidateCount);
         var vectorResults = await _vectorSearchService.SearchAsync(
             query,
             candidateCount,
             cancellationToken,
-            documentId);
+            documentId,
+            tagNames);
         var fullTextResults = await _fullTextSearchService.SearchAsync(
             query,
             candidateCount,
             cancellationToken,
-            documentId);
+            documentId,
+            tagNames);
 
         var candidates = new Dictionary<Guid, RankedCandidate>();
         var seenVectorChunkIds = new HashSet<Guid>();

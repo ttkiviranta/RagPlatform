@@ -12,4 +12,6 @@ public sealed class VectorSearchRequest
     public int TopK { get; set; } = 5;
 
     public Guid? DocumentId { get; set; }
+
+    public List<string?>? Tags { get; set; }
 }

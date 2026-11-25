@@ -51,7 +51,8 @@ public sealed class RagService : IRagService
         string query,
         int topK = 5,
         CancellationToken cancellationToken = default,
-        Guid? conversationId = null)
+        Guid? conversationId = null,
+        IReadOnlyCollection<string?>? tags = null)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
@@ -63,6 +64,7 @@ public sealed class RagService : IRagService
             throw new ArgumentOutOfRangeException(nameof(topK), "TopK must be between 1 and 20.");
         }
 
+        var tagNames = DocumentTagNames.Normalize(tags);
         var currentUser = await _currentUserService.GetCurrentUserAsync(cancellationToken);
         if (currentUser is not { IsActive: true })
         {
@@ -87,7 +89,7 @@ public sealed class RagService : IRagService
                     ?? throw new KeyNotFoundException("Conversation was not found.");
             }
 
-            var retrievedChunks = await RetrieveAsync(query, topK, cancellationToken);
+            var retrievedChunks = await RetrieveAsync(query, topK, cancellationToken, tagNames);
             retrievedChunkCount = retrievedChunks.Count;
             var availableCitations = await _citationService.CreateCitationsAsync(
                 retrievedChunks,
@@ -177,17 +179,18 @@ public sealed class RagService : IRagService
     private async Task<IReadOnlyList<VectorSearchResult>> RetrieveAsync(
         string query,
         int topK,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyCollection<string?> tags)
     {
         if (!_ragOptions.UseHybridSearch)
         {
-            var vectorResponse = await _vectorSearchService.SearchAsync(query, topK, cancellationToken);
+            var vectorResponse = await _vectorSearchService.SearchAsync(query, topK, cancellationToken, tags: tags);
             return vectorResponse.Results;
         }
 
         try
         {
-            var hybridResults = await _hybridSearchService.SearchAsync(query, topK, cancellationToken);
+            var hybridResults = await _hybridSearchService.SearchAsync(query, topK, cancellationToken, tags: tags);
             if (hybridResults.Count > 0)
             {
                 return hybridResults
@@ -212,7 +215,7 @@ public sealed class RagService : IRagService
             _logger.LogWarning(ex, "Hybrid search failed; falling back to vector search.");
         }
 
-        var fallbackResponse = await _vectorSearchService.SearchAsync(query, topK, cancellationToken);
+        var fallbackResponse = await _vectorSearchService.SearchAsync(query, topK, cancellationToken, tags: tags);
         return fallbackResponse.Results;
     }
 

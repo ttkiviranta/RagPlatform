@@ -45,7 +45,8 @@ public sealed class VectorSearchController : ControllerBase
                 request.Query,
                 request.TopK,
                 cancellationToken,
-                request.DocumentId);
+                request.DocumentId,
+                request.Tags);
             return Ok(response);
         }
         catch (ArgumentOutOfRangeException ex)
@@ -55,7 +56,7 @@ public sealed class VectorSearchController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            ModelState.AddModelError(nameof(VectorSearchRequest.Query), ex.Message);
+            ModelState.AddModelError(ex.ParamName == "tags" ? "tags" : nameof(VectorSearchRequest.Query), ex.Message);
             return ValidationProblem(ModelState);
         }
         catch (Exception ex)
