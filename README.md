@@ -265,7 +265,7 @@ Search endpoints include `POST /api/search/vector`, `POST /api/search/fulltext`,
 
 RAG retrieval is controlled by `Rag:UseHybridSearch`. It defaults to `false`, preserving vector-only RAG behavior. When enabled, RAG uses hybrid RRF retrieval; hybrid exceptions or empty results fall back to vector retrieval. Request cancellation is always propagated without fallback.
 
-A standalone Foundry reranker can rank up to 40 candidates using at most 1,000 characters per candidate and validates the returned numbered ordering. It is not registered or connected to retrieval; the registered implementation remains the pass-through placeholder. `Rag:UseReranking` defaults to `false`, and setting it to `true` currently has no effect and makes no additional model calls.
+Optional hybrid RAG reranking is controlled by `Rag:UseReranking`, which defaults to `false` and has no effect in vector-only mode. When enabled with hybrid search, the Foundry reranker ranks up to 40 authorized, tag-filtered candidates using at most 1,000 characters per candidate; it validates the returned ordering before selecting `topK`. The existing hybrid result is retained as a fallback if expansion or reranking fails. This enabled path performs an additional hybrid search and a Foundry chat call. Vector-only hybrid candidates contain snippets rather than full chunk text. Citation generation remains unchanged.
 
 ## Roadmap
 
@@ -285,10 +285,10 @@ A standalone Foundry reranker can rank up to 40 candidates using at most 1,000 c
 - PostgreSQL Integration Testing
 - GitHub Actions CI/CD
 - Document tags and all-tags retrieval filtering
+- Optional Foundry reranking for hybrid RAG
 
 ### Planned
 
-- Reranking (standalone Foundry implementation exists; RAG integration is pending)
 - Search quality evaluation
 - Additional retrieval strategies
 

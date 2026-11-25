@@ -373,6 +373,7 @@ public sealed class PostgreSqlRagEvaluationTests : PostgreSqlTestClassBase
         return new RagService(
             new FixedVectorSearchService(results),
             new EmptyHybridSearchService(),
+            new NoOpRerankingService(),
             Microsoft.Extensions.Options.Options.Create(new RagOptions { UseHybridSearch = false }),
             citation,
             new NoOpTelemetryService(),

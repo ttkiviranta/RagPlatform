@@ -39,12 +39,15 @@ public sealed class RagServiceRetrievalTests
         var vector = new FakeVectorSearchService(CreateVectorResult());
         var hybrid = new FakeHybridSearchService([CreateHybridResult()]);
         var citation = new CapturingCitationService();
-        var service = CreateService(vector, hybrid, citation, useHybridSearch: true);
+        var reranker = new FakeReranker();
+        var service = CreateService(vector, hybrid, citation, useHybridSearch: true, reranker: reranker);
 
         await service.QueryAsync("question", topK: 5, tags: [" beta ", "alpha"]);
 
         Assert.AreEqual(0, vector.CallCount);
         Assert.AreEqual(1, hybrid.CallCount);
+        Assert.AreEqual(0, reranker.CallCount);
+        CollectionAssert.AreEqual(new[] { 5 }, hybrid.TopKs.ToArray());
         CollectionAssert.AreEqual(new[] { "alpha", "beta" }, hybrid.LastTags!.ToArray());
         Assert.AreEqual(1, citation.ReceivedResults.Count);
         Assert.AreEqual(hybrid.Results[0].ChunkId, citation.ReceivedResults[0].ChunkId);
@@ -114,16 +117,132 @@ public sealed class RagServiceRetrievalTests
         Assert.AreEqual(1, hybrid.CallCount);
     }
 
+    [TestMethod]
+    public async Task QueryAsync_RerankingEnabled_SelectsExpandedCandidatesBeforeCitation()
+    {
+        var first = CreateHybridResult();
+        var second = new HybridSearchResult { ChunkId = Guid.NewGuid(), DocumentId = Guid.NewGuid(), Content = "second" };
+        var hybrid = new FakeHybridSearchService([first, second]);
+        var reranker = new FakeReranker();
+        var citation = new CapturingCitationService();
+        var service = CreateService(new FakeVectorSearchService(), hybrid, citation, true, true, reranker);
+
+        await service.QueryAsync("question", topK: 1, tags: [" beta ", "alpha"]);
+
+        CollectionAssert.AreEqual(new[] { 1, 2 }, hybrid.TopKs.ToArray());
+        Assert.IsTrue(hybrid.AllTags.All(tags => tags!.SequenceEqual(new[] { "alpha", "beta" })));
+        Assert.AreEqual(1, reranker.CallCount);
+        Assert.AreEqual("question", reranker.Query);
+        CollectionAssert.AreEqual(new[] { first.ChunkId, second.ChunkId }, reranker.Candidates.Select(item => item.ChunkId).ToArray());
+        Assert.AreEqual(second.ChunkId, citation.ReceivedResults.Single().ChunkId);
+        Assert.AreEqual(second.DocumentId, citation.ReceivedResults.Single().DocumentId);
+    }
+
+    [DataTestMethod]
+    [DataRow("[2,1]", true)]
+    [DataRow("[1,1]", false)]
+    public async Task QueryAsync_FoundryReranker_UsesValidatedOrderOrBaseline(string response, bool valid)
+    {
+        var first = CreateHybridResult();
+        var second = new HybridSearchResult { ChunkId = Guid.NewGuid(), DocumentId = Guid.NewGuid(), Content = "second" };
+        var chat = new FakeChat(response);
+        var citation = new CapturingCitationService();
+        var service = CreateService(new FakeVectorSearchService(), new FakeHybridSearchService([first, second]), citation, true, true, new FoundryRerankingService(chat));
+
+        await service.QueryAsync("question", topK: 1);
+
+        Assert.AreEqual(1, chat.CallCount);
+        Assert.AreEqual(valid ? second.ChunkId : first.ChunkId, citation.ReceivedResults.Single().ChunkId);
+    }
+
+    [TestMethod]
+    public async Task QueryAsync_MaxTopK_CapsExpandedCandidateCountAtForty()
+    {
+        var hybrid = new FakeHybridSearchService([CreateHybridResult()]);
+        var reranker = new FakeReranker();
+        var service = CreateService(new FakeVectorSearchService(), hybrid, new CapturingCitationService(), true, true, reranker);
+
+        await service.QueryAsync("question", topK: 20);
+
+        CollectionAssert.AreEqual(new[] { 20, 40 }, hybrid.TopKs.ToArray());
+        Assert.AreEqual(1, reranker.CallCount);
+    }
+
+    [TestMethod]
+    public async Task QueryAsync_RerankingFailure_UsesOriginalHybridRanking()
+    {
+        var first = CreateHybridResult();
+        var second = new HybridSearchResult { ChunkId = Guid.NewGuid(), DocumentId = Guid.NewGuid(), Content = "second" };
+        var hybrid = new FakeHybridSearchService([first, second]) { ExpandedResults = [second, first] };
+        var vector = new FakeVectorSearchService();
+        var reranker = new FakeReranker { Error = new InvalidOperationException("invalid output") };
+        var citation = new CapturingCitationService();
+        var service = CreateService(vector, hybrid, citation, true, true, reranker);
+
+        await service.QueryAsync("question", topK: 1, tags: ["alpha"]);
+
+        CollectionAssert.AreEqual(new[] { 1, 2 }, hybrid.TopKs.ToArray());
+        Assert.AreEqual(first.ChunkId, citation.ReceivedResults.Single().ChunkId);
+        Assert.AreEqual(0, vector.CallCount);
+    }
+
+    [TestMethod]
+    public async Task QueryAsync_ExpandedSearchFails_UsesBaseline()
+    {
+        var first = CreateHybridResult();
+        var hybrid = new FakeHybridSearchService([first]) { ExpandedError = new InvalidOperationException("expanded search failed") };
+        var reranker = new FakeReranker();
+        var citation = new CapturingCitationService();
+        var service = CreateService(new FakeVectorSearchService(), hybrid, citation, true, true, reranker);
+
+        await service.QueryAsync("question", topK: 1);
+
+        Assert.AreEqual(first.ChunkId, citation.ReceivedResults.Single().ChunkId);
+        Assert.AreEqual(0, reranker.CallCount);
+    }
+
+    [TestMethod]
+    public async Task QueryAsync_EnabledInVectorMode_DoesNotRerank()
+    {
+        var reranker = new FakeReranker();
+        var vector = new FakeVectorSearchService(CreateVectorResult());
+        var hybrid = new FakeHybridSearchService([CreateHybridResult()]);
+        var citation = new CapturingCitationService();
+        var service = CreateService(vector, hybrid, citation, false, true, reranker);
+
+        await service.QueryAsync("question");
+
+        Assert.AreEqual(0, reranker.CallCount);
+        Assert.AreEqual(0, hybrid.CallCount);
+        Assert.AreEqual(1, vector.CallCount);
+    }
+
+    [TestMethod]
+    public async Task QueryAsync_RerankerCancellation_DoesNotFallBack()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var reranker = new FakeReranker { OnCall = cancellation.Cancel };
+        var citation = new CapturingCitationService();
+        var service = CreateService(new FakeVectorSearchService(), new FakeHybridSearchService([CreateHybridResult()]), citation, true, true, reranker);
+
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => service.QueryAsync("question", cancellationToken: cancellation.Token));
+        Assert.AreEqual(1, reranker.CallCount);
+        Assert.AreEqual(0, citation.ReceivedResults.Count);
+    }
+
     private static RagService CreateService(
         FakeVectorSearchService vector,
         FakeHybridSearchService hybrid,
         CapturingCitationService citation,
-        bool useHybridSearch)
+        bool useHybridSearch,
+        bool useReranking = false,
+        IRerankingService? reranker = null)
     {
         return new RagService(
             vector,
             hybrid,
-            Microsoft.Extensions.Options.Options.Create(new RagOptions { UseHybridSearch = useHybridSearch }),
+            reranker ?? new NoOpRerankingService(),
+            Microsoft.Extensions.Options.Options.Create(new RagOptions { UseHybridSearch = useHybridSearch, UseReranking = useReranking }),
             citation,
             new NoOpTelemetryService(),
             new FakeCurrentUserService(),
@@ -178,7 +297,11 @@ public sealed class RagServiceRetrievalTests
         public IReadOnlyList<HybridSearchResult> Results { get; } = results;
         public int CallCount { get; private set; }
         public Exception? Error { get; set; }
+        public Exception? ExpandedError { get; init; }
+        public IReadOnlyList<HybridSearchResult>? ExpandedResults { get; init; }
         public IReadOnlyCollection<string?>? LastTags { get; private set; }
+        public List<int> TopKs { get; } = [];
+        public List<IReadOnlyCollection<string?>?> AllTags { get; } = [];
 
         public Task<IReadOnlyList<HybridSearchResult>> SearchAsync(
             string query,
@@ -189,12 +312,49 @@ public sealed class RagServiceRetrievalTests
         {
             CallCount++;
             LastTags = tags;
+            TopKs.Add(topK);
+            AllTags.Add(tags);
             if (Error is not null)
             {
                 return Task.FromException<IReadOnlyList<HybridSearchResult>>(Error);
             }
+            if (CallCount > 1 && ExpandedError is not null)
+            {
+                return Task.FromException<IReadOnlyList<HybridSearchResult>>(ExpandedError);
+            }
 
-            return Task.FromResult(Results);
+            var source = CallCount > 1 && ExpandedResults is not null ? ExpandedResults : Results;
+            return Task.FromResult<IReadOnlyList<HybridSearchResult>>(source.Take(topK).ToArray());
+        }
+    }
+
+    private sealed class FakeReranker : IRerankingService
+    {
+        public int CallCount { get; private set; }
+        public string? Query { get; private set; }
+        public IReadOnlyList<VectorSearchResult> Candidates { get; private set; } = [];
+        public Exception? Error { get; init; }
+        public Action? OnCall { get; init; }
+
+        public Task<IReadOnlyList<VectorSearchResult>> RerankAsync(string query, IReadOnlyList<VectorSearchResult> candidates, CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            Query = query;
+            Candidates = candidates;
+            OnCall?.Invoke();
+            if (Error is not null) return Task.FromException<IReadOnlyList<VectorSearchResult>>(Error);
+            return Task.FromResult<IReadOnlyList<VectorSearchResult>>(candidates.Reverse().ToArray());
+        }
+    }
+
+    private sealed class FakeChat(string answer) : IFoundryChatCompletionService
+    {
+        public int CallCount { get; private set; }
+
+        public Task<FoundryChatCompletionResponse> CompleteAsync(string systemPrompt, IReadOnlyList<RagChatMessage> messages, CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            return Task.FromResult(new FoundryChatCompletionResponse { Answer = answer });
         }
     }
 

@@ -69,7 +69,7 @@ public sealed class NoOpRerankingServiceTests
     [DataTestMethod]
     [DataRow(false)]
     [DataRow(true)]
-    public void Application_RegistersPlaceholderAndBindsOption(bool enabled)
+    public void Application_RegistersConfiguredRerankerAndBindsOption(bool enabled)
     {
         using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -85,6 +85,14 @@ public sealed class NoOpRerankingServiceTests
         using var scope = factory.Services.CreateScope();
 
         Assert.AreEqual(enabled, scope.ServiceProvider.GetRequiredService<IOptions<RagOptions>>().Value.UseReranking);
-        Assert.IsInstanceOfType<NoOpRerankingService>(scope.ServiceProvider.GetRequiredService<IRerankingService>());
+        var reranker = scope.ServiceProvider.GetRequiredService<IRerankingService>();
+        if (enabled)
+        {
+            Assert.IsInstanceOfType<FoundryRerankingService>(reranker);
+        }
+        else
+        {
+            Assert.IsInstanceOfType<NoOpRerankingService>(reranker);
+        }
     }
 }

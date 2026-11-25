@@ -14,6 +14,7 @@ public sealed class RagService : IRagService
 {
     private readonly IVectorSearchService _vectorSearchService;
     private readonly IHybridSearchService _hybridSearchService;
+    private readonly IRerankingService _rerankingService;
     private readonly RagOptions _ragOptions;
     private readonly IRagCitationService _citationService;
     private readonly ITelemetryService _telemetryService;
@@ -26,6 +27,7 @@ public sealed class RagService : IRagService
     public RagService(
         IVectorSearchService vectorSearchService,
         IHybridSearchService hybridSearchService,
+        IRerankingService rerankingService,
         IOptions<RagOptions> ragOptions,
         IRagCitationService citationService,
         ITelemetryService telemetryService,
@@ -37,6 +39,7 @@ public sealed class RagService : IRagService
     {
         _vectorSearchService = vectorSearchService;
         _hybridSearchService = hybridSearchService;
+        _rerankingService = rerankingService;
         _ragOptions = ragOptions.Value;
         _citationService = citationService;
         _telemetryService = telemetryService;
@@ -188,23 +191,10 @@ public sealed class RagService : IRagService
             return vectorResponse.Results;
         }
 
+        IReadOnlyList<HybridSearchResult> hybridResults;
         try
         {
-            var hybridResults = await _hybridSearchService.SearchAsync(query, topK, cancellationToken, tags: tags);
-            if (hybridResults.Count > 0)
-            {
-                return hybridResults
-                    .Select(result => new VectorSearchResult
-                    {
-                        DocumentId = result.DocumentId,
-                        ChunkId = result.ChunkId,
-                        SimilarityScore = 0,
-                        ContentSnippet = result.Content
-                    })
-                    .ToList();
-            }
-
-            _logger.LogWarning("Hybrid search returned no results; falling back to vector search.");
+            hybridResults = await _hybridSearchService.SearchAsync(query, topK, cancellationToken, tags: tags);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -213,10 +203,62 @@ public sealed class RagService : IRagService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Hybrid search failed; falling back to vector search.");
+            var fallback = await _vectorSearchService.SearchAsync(query, topK, cancellationToken, tags: tags);
+            return fallback.Results;
         }
 
-        var fallbackResponse = await _vectorSearchService.SearchAsync(query, topK, cancellationToken, tags: tags);
-        return fallbackResponse.Results;
+        if (hybridResults.Count == 0)
+        {
+            _logger.LogWarning("Hybrid search returned no results; falling back to vector search.");
+            var fallback = await _vectorSearchService.SearchAsync(query, topK, cancellationToken, tags: tags);
+            return fallback.Results;
+        }
+
+        var baseline = MapHybridResults(hybridResults);
+        if (!_ragOptions.UseReranking)
+        {
+            return baseline;
+        }
+
+        try
+        {
+            var candidateCount = Math.Min(topK * 2, FoundryRerankingService.MaximumCandidates);
+            var expanded = await _hybridSearchService.SearchAsync(query, candidateCount, cancellationToken, tags: tags);
+            if (expanded.Count == 0)
+            {
+                _logger.LogWarning("Expanded hybrid search returned no candidates; using original hybrid ranking.");
+                return baseline;
+            }
+
+            var candidates = MapHybridResults(expanded);
+            var ranked = await _rerankingService.RerankAsync(query, candidates, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            var remaining = new HashSet<VectorSearchResult>(candidates);
+            if (ranked.Count != candidates.Count || ranked.Any(candidate => !remaining.Remove(candidate)))
+            {
+                throw new InvalidOperationException("Reranking returned an invalid candidate set.");
+            }
+
+            return ranked.Take(topK).ToList();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Reranking failed; using original hybrid ranking.");
+            return baseline;
+        }
     }
+
+    private static List<VectorSearchResult> MapHybridResults(IReadOnlyList<HybridSearchResult> results) =>
+        results.Select(result => new VectorSearchResult
+        {
+            DocumentId = result.DocumentId,
+            ChunkId = result.ChunkId,
+            SimilarityScore = 0,
+            ContentSnippet = result.Content
+        }).ToList();
 
 }

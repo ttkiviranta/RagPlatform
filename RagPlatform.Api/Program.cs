@@ -292,7 +292,10 @@ builder.Services.AddScoped<IContextBuilder, ContextBuilder>();
 builder.Services.AddScoped<IPromptBuilder, PromptBuilder>();
 builder.Services.AddScoped<IRagCitationService, RagCitationService>();
 builder.Services.AddScoped<IAnswerGenerationService, FoundryAnswerGenerationService>();
-builder.Services.AddScoped<IRerankingService, NoOpRerankingService>();
+builder.Services.AddScoped<IRerankingService>(services =>
+    services.GetRequiredService<IOptions<RagOptions>>().Value.UseReranking
+        ? new FoundryRerankingService(services.GetRequiredService<IFoundryChatCompletionService>())
+        : new NoOpRerankingService());
 builder.Services.AddScoped<IRagService, RagService>();
 builder.Services.AddScoped<IFoundryChatCompletionService, FoundryChatCompletionService>();
 if (applicationInsightsEnabled)
