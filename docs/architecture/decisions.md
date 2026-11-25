@@ -31,9 +31,9 @@ This file indexes cross-phase decisions documented in the repository. Phase-spec
 ## Q&A direction
 
 - Phase 13's intended first release is a deterministic application-owned retrieve-and-answer pipeline, not an autonomous agent.
-- Query embedding must be compatible with indexed document embeddings; retrieval applies authorization before ranking.
+- Query embedding must be compatible with indexed document embeddings; retrieval applies authorization before ranking. Optional document tags further constrain vector and full-text results, and all requested tags must match.
 - Citation labels and metadata must be generated and validated by the API. Conversation history remains owner-scoped and bounded.
-- Hybrid retrieval, reranking, caching, streaming, and agents are conditional future enhancements, not assumed initial scope.
+- Hybrid RRF retrieval and Foundry reranking are implemented as separate disabled-by-default RAG options. Reranking retains the original hybrid ranking on failure; its effect on retrieval quality requires evaluation. Caching, streaming, and agents were not assumed in the initial Q&A scope.
 
 ## Decisions not fully documented
 

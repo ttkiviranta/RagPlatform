@@ -7,8 +7,8 @@ Provide authenticated document Q&A over the imported corpus. The planned request
 ## Architecture decisions recorded in the planning discussion
 
 - Keep retrieval and authorization in the API, not as model-controlled tools.
-- Apply tenant, owner, document-ACL, and optional document-scope filters in the database query before returning chunks.
-- Start with pgvector similarity search; hybrid search and RRF are implemented and exposed. RAG retrieval defaults to vector search and can enable hybrid RRF through `Rag:UseHybridSearch`, with vector fallback on failure or empty hybrid results. Reranking remains evaluation-driven.
+- Apply tenant, owner, document-ACL, and optional document-scope filters in the database query before returning chunks. Optional tag filters also apply before ranking and require all requested tags.
+- Start with pgvector similarity search; hybrid search and RRF are implemented and exposed. RAG retrieval defaults to vector search and can enable hybrid RRF through `Rag:UseHybridSearch`, with vector fallback on failure or empty hybrid results. Optional `Rag:UseReranking` adds Foundry reranking to hybrid RAG and defaults to false; its quality remains subject to [evaluation](../../validation/reranking-evaluation.md).
 - Assign citation labels and source metadata server-side; never trust model-generated document IDs or locations. Abstain when retrieved evidence is insufficient.
 - Keep conversation history application-managed, owner-scoped, bounded, and freshly authorized on each turn.
 - Begin with a deterministic single-agent pipeline; agent orchestration is not required for the initial Q&A feature.

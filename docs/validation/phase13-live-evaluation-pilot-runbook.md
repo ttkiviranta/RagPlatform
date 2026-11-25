@@ -37,6 +37,7 @@ Configuration can be supplied by environment variables or another approved .NET 
 | `Foundry__ChatTimeoutSeconds` | Record the effective value; default `60`, allowed range `1`-`60`. |
 | `Foundry__ChatTemperature` | Record the effective value; default `0.2`, allowed range `0`-`2`, subject to model support. |
 | `Rag__UseHybridSearch` | Set `false` for the baseline; set `true` only for the comparison run. |
+| `Rag__UseReranking` | Set `false` for both runs to compare vector and hybrid RRF without reranking. |
 | `ServiceBus__DocumentImportWorkerEnabled` | Set `false` for this pilot. |
 | `AzureAd__Authority` and `AzureAd__Audience` | Supply approved test values when the checked-in/default configuration is not the selected test application. Confirm issuer, audience and active application user. `AzureAd__TenantId` and `AzureAd__ClientId` are also used as configuration fallbacks where applicable. |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | Optional, when an approved isolated Application Insights resource is used and `ApplicationInsights__ConnectionString` is not set. Protect the value and verify retention/privacy settings. |
@@ -47,9 +48,9 @@ Use the actual effective values and permitted configuration source; defaults in 
 ## 3. Retrieval settings and limits
 
 1. Run the initial seven cases with `Rag__UseHybridSearch=false` and `topK=5`.
-2. Restart the API with `Rag__UseHybridSearch=true` and repeat **AQ-005 and AQ-006** using the same corpus, identity, Top-K, and model settings. Record this as a separate hybrid comparison, not a replacement for the vector baseline.
+2. Restart the API with `Rag__UseHybridSearch=true` and repeat **AQ-005 and AQ-006** using the same corpus, identity, Top-K, and model settings. Record this as a separate hybrid comparison, not a replacement for the vector baseline. Keep `Rag__UseReranking=false`; a separate [reranking evaluation](reranking-evaluation.md) compares RRF with reranking.
 3. Hybrid retrieval falls back to vector when it fails or returns no results. Check the sanitized application warnings for `Hybrid search failed` or `Hybrid search returned no results`; record the actual fallback if observed. If the actual path cannot be established, mark it **unknown**, not hybrid success. Investigate before scoring a hybrid comparison.
-4. Full-text-only is a standalone search endpoint, not a RAG mode. `/api/rag/query` accepts `query`, `topK` (1-20), and optional `conversationId`; it does not accept a document ID.
+4. Full-text-only is a standalone search endpoint, not a RAG mode. `/api/rag/query` accepts `query`, `topK` (1-20), optional `conversationId`, and optional `tags`; it does not accept a document ID. Omit tags for the unfiltered pilot corpus.
 5. The citation service reloads authorized persisted chunks and produces normalized excerpts; excerpts are capped at 500 characters and the assembled answer context is bounded to 4,000 characters. Citation labels are assigned at runtime. Do not assume a particular document always receives `[1]`.
 
 ## 4. Exact execution procedure
