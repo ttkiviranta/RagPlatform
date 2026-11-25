@@ -267,6 +267,8 @@ RAG retrieval is controlled by `Rag:UseHybridSearch`. It defaults to `false`, pr
 
 Optional hybrid RAG reranking is controlled by `Rag:UseReranking`, which defaults to `false` and has no effect in vector-only mode. When enabled with hybrid search, the Foundry reranker ranks up to 40 authorized, tag-filtered candidates using at most 1,000 characters per candidate; it validates the returned ordering before selecting `topK`. The existing hybrid result is retained as a fallback if expansion or reranking fails. This enabled path performs an additional hybrid search and a Foundry chat call. Vector-only hybrid candidates contain snippets rather than full chunk text. Citation generation remains unchanged.
 
+An opt-in [reranking evaluation](docs/validation/reranking-evaluation.md) compares retrieval ordering, relevance, latency and available token usage against the hybrid baseline. It requires an isolated live environment and does not assume reranking improves results.
+
 ## Roadmap
 
 ### Completed
