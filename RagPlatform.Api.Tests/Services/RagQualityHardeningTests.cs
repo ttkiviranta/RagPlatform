@@ -158,7 +158,7 @@ public sealed class RagQualityHardeningTests
             1,
             [CreateCitation("The document describes the product warranty.")],
             Array.Empty<ConversationMessageResponse>(),
-            allowModelKnowledgeFallback: true);
+            allowModelKnowledgeFallback: false);
 
         Assert.AreEqual(PromptBuilder.InsufficientEvidenceResponse, result.Answer);
         Assert.IsNull(result.AnswerSource);
@@ -168,6 +168,37 @@ public sealed class RagQualityHardeningTests
         Assert.AreEqual(0, telemetry.AnswerGenerationEvents.Single().CitationCount);
         Assert.AreEqual(90, telemetry.AnswerGenerationEvents.Single().InputTokenCount);
         Assert.AreEqual(7, telemetry.AnswerGenerationEvents.Single().OutputTokenCount);
+    }
+
+    [TestMethod]
+    public async Task GenerateAnswerAsync_WhenEvidenceIsInsufficientAndFallbackEnabled_UsesModelKnowledge()
+    {
+        var chat = new CapturingChatCompletionService();
+        chat.Responses.Enqueue(new FoundryChatCompletionResponse { Answer = PromptBuilder.InsufficientEvidenceResponse, InputTokenCount = 90, OutputTokenCount = 7 });
+        chat.Responses.Enqueue(new FoundryChatCompletionResponse { Answer = "Helsinki.", InputTokenCount = 21, OutputTokenCount = 3 });
+        var telemetry = new RecordingTelemetryService();
+        var service = CreateService(chat, telemetry);
+
+        var result = await service.GenerateAnswerAsync(
+            "What is the capital of Finland?",
+            1,
+            [CreateCitation("The document describes the product warranty.")],
+            [new ConversationMessageResponse { Role = "User", Content = "Previous question" }],
+            allowModelKnowledgeFallback: true);
+
+        Assert.AreEqual("Helsinki.", result.Answer);
+        Assert.AreEqual(RagAnswerSource.ModelKnowledge, result.AnswerSource);
+        Assert.AreEqual(0, result.CitationNumbers.Count);
+        Assert.AreEqual(2, chat.CallCount);
+        Assert.AreEqual("What is the capital of Finland?", chat.Messages.Single().Content);
+        StringAssert.Contains(chat.SystemPrompt!, "Do not invent or include citations");
+        Assert.AreEqual(2, telemetry.AnswerGenerationEvents.Count);
+        Assert.AreEqual("InsufficientEvidence", telemetry.AnswerGenerationEvents[0].Outcome);
+        Assert.AreEqual(90, telemetry.AnswerGenerationEvents[0].InputTokenCount);
+        Assert.AreEqual(7, telemetry.AnswerGenerationEvents[0].OutputTokenCount);
+        Assert.AreEqual("ModelKnowledge", telemetry.AnswerGenerationEvents[1].Outcome);
+        Assert.AreEqual(21, telemetry.AnswerGenerationEvents[1].InputTokenCount);
+        Assert.AreEqual(3, telemetry.AnswerGenerationEvents[1].OutputTokenCount);
     }
 
     [TestMethod]
@@ -213,8 +244,10 @@ public sealed class RagQualityHardeningTests
             "Question?",
             1,
             [CreateCitation("Authorized evidence")],
-            Array.Empty<ConversationMessageResponse>()));
+            Array.Empty<ConversationMessageResponse>(),
+            allowModelKnowledgeFallback: true));
 
+        Assert.AreEqual(1, chat.CallCount);
         var failure = telemetry.AnswerGenerationEvents.Single();
         Assert.AreEqual("CitationValidationFailed", failure.Outcome);
         Assert.IsFalse(failure.Success);
@@ -256,6 +289,8 @@ public sealed class RagQualityHardeningTests
 
         public FoundryChatCompletionResponse Response { get; init; } = new();
 
+        public Queue<FoundryChatCompletionResponse> Responses { get; } = new();
+
         public Exception? Error { get; init; }
 
         public Action? OnCall { get; init; }
@@ -272,7 +307,7 @@ public sealed class RagQualityHardeningTests
             Messages = messages;
             OnCall?.Invoke();
             return Error is null
-                ? Task.FromResult(Response)
+                ? Task.FromResult(Responses.Count > 0 ? Responses.Dequeue() : Response)
                 : Task.FromException<FoundryChatCompletionResponse>(Error);
         }
     }

@@ -169,6 +169,12 @@ public sealed class FoundryAnswerGenerationService : IAnswerGenerationService
             _deployment,
             stopwatch.Elapsed.TotalMilliseconds);
 
+        if (allowModelKnowledgeFallback && outcome == "InsufficientEvidence")
+        {
+            stopwatch.Restart();
+            return await GenerateModelKnowledgeAsync(question, retrievedChunkCount, stopwatch, cancellationToken);
+        }
+
         return new GroundedAnswerResult(
             answer,
             citationNumbers,

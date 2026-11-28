@@ -242,6 +242,39 @@ public sealed class RagServiceRetrievalTests
         Assert.AreEqual(0, conversation.Citations!.Count);
     }
 
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task QueryAsync_GroundedAbstention_UsesModelKnowledgeOnlyWhenRetrievalSucceeds(bool hybridFails)
+    {
+        var chat = new RagQualityHardeningTests.CapturingChatCompletionService();
+        chat.Responses.Enqueue(new FoundryChatCompletionResponse { Answer = PromptBuilder.InsufficientEvidenceResponse });
+        chat.Responses.Enqueue(new FoundryChatCompletionResponse { Answer = "Helsinki." });
+        var vector = new FakeVectorSearchService(CreateVectorResult());
+        var hybrid = new FakeHybridSearchService([CreateHybridResult()])
+        {
+            Error = hybridFails ? new InvalidOperationException("failed") : null
+        };
+        var citation = new CapturingCitationService { Citations = [new RagCitationDto { CitationNumber = 1, Excerpt = "Unrelated evidence" }] };
+        var conversation = new FakeConversationMessageService();
+        var service = CreateService(vector, hybrid, citation, true,
+            allowModelKnowledgeFallback: true, answer: CreateAnswerService(chat), conversation: conversation);
+
+        var response = await service.QueryAsync("What is the capital of Finland?", tags: ["general"]);
+
+        Assert.AreEqual(hybridFails ? PromptBuilder.InsufficientEvidenceResponse : "Helsinki.", response.Answer);
+        Assert.AreEqual(hybridFails ? null : RagAnswerSource.ModelKnowledge, response.AnswerSource);
+        Assert.AreEqual(0, response.Citations.Count);
+        Assert.AreEqual(hybridFails ? 1 : 2, chat.CallCount);
+        Assert.AreEqual(hybridFails ? PromptBuilder.InsufficientEvidenceResponse : "Model knowledge (no supporting documents found):\nHelsinki.", conversation.AssistantContent);
+        Assert.AreEqual(0, conversation.Citations!.Count);
+        CollectionAssert.AreEqual(new[] { "general" }, hybrid.LastTags!.ToArray());
+        if (hybridFails)
+        {
+            CollectionAssert.AreEqual(new[] { "general" }, vector.LastTags!.ToArray());
+        }
+    }
+
     [TestMethod]
     public async Task QueryAsync_HybridFailureThenEmptyVector_DoesNotInvokeModelKnowledge()
     {
