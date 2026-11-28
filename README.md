@@ -135,6 +135,37 @@ dotnet test RagPlatform.Api.Tests/RagPlatform.Api.Tests.csproj --filter "TestCat
 
 CI runs the unit and PostgreSQL test categories in separate workflows. Live Foundry and Service Bus behaviors require isolated Azure resources; see the [validation roadmap](docs/validation/phase12-phase13-validation-roadmap.md).
 
+### Development environment isolation
+
+Some failures during development came from the workstation rather than the code. For example, host security policy can block a freshly built executable even though the same assembly runs correctly with `dotnet <assembly>.dll`. To separate such cases from product defects, the project was also built and exercised in a clean Windows 11 Hyper-V virtual machine. This is a troubleshooting and validation approach, not a requirement for contributors.
+
+A comparison between the host and a clean VM helps classify a failure:
+
+| Observation | Likely category |
+| --- | --- |
+| Fails on the host and in the clean VM | Application defect |
+| Fails in both and the error names a database object, such as a missing column | Database or migration issue |
+| Fails in both and the error comes from a Foundry call, such as authentication, deployment name, or model access | Azure Foundry integration or configuration issue |
+| Passes in the clean VM but fails on the host | Local workstation environment issue, such as security policy, installed tooling, or local configuration |
+
+The reference VM contained only:
+
+- Windows 11
+- Visual Studio Community
+- .NET 10 SDK
+- Azure CLI
+- Network access to the PostgreSQL/pgvector container running in Docker on the host machine
+
+Suggested workflow:
+
+1. Create the VM from a clean Windows 11 image and take a checkpoint before installing project tooling.
+2. Install the tools listed above, clone the repository, and sign in with Azure CLI if Azure-backed features are needed.
+3. Publish the PostgreSQL port from the host container, allow access from the VM network, and supply the connection string through User Secrets or environment variables. Do not commit credentials.
+4. Apply migrations with `dotnet ef database update`, then build, run, and exercise the same API request on both machines.
+5. Compare the results using the table above before changing application code.
+
+Using one shared database keeps data and schema constant between the two environments, but it also means migrations and test data affect both. Use a disposable database for destructive or test-data-sensitive work. This approach isolates host-specific behavior; it does not replace the automated unit and PostgreSQL integration tests or the live Azure validation described in the [validation roadmap](docs/validation/phase12-phase13-validation-roadmap.md).
+
 ## Testing and CI
 
 ### Unit Tests
@@ -272,6 +303,56 @@ Optional hybrid RAG reranking is controlled by `Rag:UseReranking`, which default
 An opt-in [reranking evaluation](docs/validation/reranking-evaluation.md) compares retrieval ordering, relevance, latency and available token usage against the hybrid baseline. It requires an isolated live environment and does not assume reranking improves results.
 
 `Rag:AllowModelKnowledgeFallback` defaults to `false`. When enabled, a successful retrieval with no usable authorized document context, or a validated insufficient-evidence response from grounded generation, invokes Foundry using the current question without document context or conversation history. After a grounded abstention this requires a second chat call, adding latency and token cost; the model's abstention is not proof that no supporting document exists. The response has `answerSource: "ModelKnowledge"` and an empty `citations` array; clients should display "Model knowledge (no supporting documents found)". The persisted assistant message includes this label, but does not store a structured source field. Grounded responses and disabled behavior are unchanged. A retrieval failure never authorizes model-knowledge fallback, even if the existing vector fallback returns no results. Model failures propagate. The prompt prohibits citations and numeric bracketed citation labels are rejected, but model output may still contain other unsupported source claims; model knowledge can be incorrect or stale.
+
+### Answer sources and model knowledge fallback
+
+`POST /api/rag/query` produces one of three outcomes. The first two are the default behavior; the third requires explicit configuration.
+
+| Outcome | When it occurs | `answer` | `citations` | `answerSource` |
+| --- | --- | --- | --- | --- |
+| Retrieved-document answer | Authorized evidence supports the answer | Answer text containing citation labels such as `[1]` | One entry per cited source | Omitted |
+| Insufficient evidence | No usable evidence, or the model reports that the evidence does not answer the question, and fallback is disabled or not permitted | `not found in accessible documents` | Empty | Omitted |
+| Model knowledge fallback | Fallback is enabled, retrieval succeeded, and there is no usable evidence or the grounded answer was an insufficient-evidence response | Answer from the model's general knowledge | Empty | `ModelKnowledge` |
+
+Retrieval always applies the existing tenant, owner, and tag restrictions. The platform does not use a similarity threshold, so unrelated chunks can still be retrieved. In that case the grounded model may return the insufficient-evidence response; with fallback enabled, that response triggers a second call that sees only the current question.
+
+To enable the fallback, set the option before starting the API process:
+
+```text
+Rag__AllowModelKnowledgeFallback=true
+```
+
+This is the environment-variable form of `Rag:AllowModelKnowledgeFallback`. The setting defaults to `false`, and the committed configuration keeps it disabled. In PowerShell:
+
+```powershell
+$env:Rag__AllowModelKnowledgeFallback = "true"
+dotnet .\RagPlatform.Api\bin\Debug\net10.0\RagPlatform.Api.dll
+```
+
+Restart the API after changing the setting. Visual Studio launch profiles use their own environment settings.
+
+Example fallback response:
+
+```json
+{
+  "conversationId": "00000000-0000-0000-0000-000000000000",
+  "answer": "Helsinki.",
+  "answerSource": "ModelKnowledge",
+  "citations": []
+}
+```
+
+The answer text is generated by the model and will vary.
+
+Citations are expected only when the answer is supported by retrieved documents. They are intentionally absent for insufficient-evidence and model-knowledge responses because no document supports those answers, and the platform does not create citations for them. Clients should show a visible label such as "Model knowledge (no supporting documents found)" whenever `answerSource` is `ModelKnowledge`.
+
+Limitations:
+
+- Fallback does not run after a recorded retrieval or reranking failure, so an error cannot silently produce an ungrounded answer.
+- Fallback after an insufficient-evidence response adds a second model call, with additional latency and token cost.
+- The fallback call does not include documents or conversation history.
+- The model's statement that evidence is insufficient is not proof that no relevant document exists.
+- Model-knowledge answers can be incorrect, out of date, or contain unsupported claims. Do not use them where grounded answers are required.
 
 ## Roadmap
 
